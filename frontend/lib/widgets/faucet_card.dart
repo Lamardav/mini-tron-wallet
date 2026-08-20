@@ -92,7 +92,7 @@ class _FaucetCardState extends ConsumerState<FaucetCard> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: palette.surface,
-            border: Border.all(color: palette.borderStrong, style: BorderStyle.solid),
+            border: Border.all(color: palette.border),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
