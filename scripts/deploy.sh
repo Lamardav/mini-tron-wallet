@@ -7,7 +7,7 @@ HOST=root@188.127.237.116
 DIR=/opt/tron-wallet
 
 echo "building the web bundle"
-(cd frontend && flutter build web --release --dart-define=API_URL=/api)
+(cd frontend && flutter build web --release)
 
 echo "uploading tracked sources"
 git archive HEAD | ssh "$HOST" "mkdir -p $DIR && tar -x -C $DIR"
