@@ -15,7 +15,6 @@ class WalletUser {
     required this.id,
     required this.email,
     required this.address,
-    required this.emailVerified,
   });
 
   factory WalletUser.fromJson(Map<String, dynamic> json) {
@@ -23,14 +22,12 @@ class WalletUser {
       id: json['id'] as String,
       email: json['email'] as String,
       address: json['address'] as String?,
-      emailVerified: json['emailVerified'] as bool? ?? false,
     );
   }
 
   final String id;
   final String email;
   final String? address;
-  final bool emailVerified;
 }
 
 class AuthState {
@@ -63,10 +60,6 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> signOut() async {
     await ref.read(tokenStorageProvider).clear();
     state = const AuthState(restored: true);
-  }
-
-  Future<void> resendVerification() async {
-    await ref.read(apiClientProvider).post('/auth/resend-verification', const {});
   }
 
   Future<void> _restoreSession() async {
