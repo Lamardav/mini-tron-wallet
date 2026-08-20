@@ -31,6 +31,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   String _idempotencyKey = const Uuid().v4();
   Timer? _debounce;
   FeeEstimate? _fee;
+  String? _feeProblem;
   bool _estimating = false;
   bool _sending = false;
   String? _error;
@@ -64,6 +65,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       if (mounted) {
         setState(() {
           _fee = null;
+          _feeProblem = null;
           _estimating = false;
         });
       }
@@ -81,13 +83,15 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       if (mounted) {
         setState(() {
           _fee = fee;
+          _feeProblem = null;
           _estimating = false;
         });
       }
-    } on ApiException {
+    } on ApiException catch (error) {
       if (mounted) {
         setState(() {
           _fee = null;
+          _feeProblem = humanizeError(error.message);
           _estimating = false;
         });
       }
@@ -211,6 +215,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                     child: _CostSummary(
                       amountNano: preview,
                       fee: _fee,
+                      problem: _feeProblem,
                       estimating: _estimating,
                     ),
                   ),
@@ -263,11 +268,13 @@ class _CostSummary extends StatelessWidget {
   const _CostSummary({
     required this.amountNano,
     required this.fee,
+    required this.problem,
     required this.estimating,
   });
 
   final BigInt? amountNano;
   final FeeEstimate? fee;
+  final String? problem;
   final bool estimating;
 
   @override
@@ -299,6 +306,25 @@ class _CostSummary extends StatelessWidget {
                 fontSize: 13,
                 color: palette.inkFaint,
               ),
+            )
+          else if (problem != null)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline, size: 15, color: palette.failed),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    problem!,
+                    style: TextStyle(
+                      fontFamily: sansFamily,
+                      fontSize: 13,
+                      height: 1.4,
+                      color: palette.failed,
+                    ),
+                  ),
+                ),
+              ],
             )
           else if (fee == null)
             Text(

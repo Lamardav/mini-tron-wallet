@@ -65,6 +65,9 @@ export class WalletService {
 
     const amountNano = this.parseAmount(dto.amountNano);
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+
+    this.rejectSelfTransfer(wallet.address, dto.toAddress);
+
     const fee = await this.tron.estimateFee(wallet.address, dto.toAddress, amountNano);
     const totalNano = amountNano + fee.totalNano;
 
@@ -111,6 +114,9 @@ export class WalletService {
     }
 
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+
+    this.rejectSelfTransfer(wallet.address, dto.toAddress);
+
     const balanceNano = await this.tron.getBalanceNano(wallet.address);
 
     if (balanceNano < amountNano) {
@@ -137,6 +143,12 @@ export class WalletService {
     this.events.bump(userId);
 
     return toTransactionResponse(sent);
+  }
+
+  private rejectSelfTransfer(ownAddress: string, toAddress: string) {
+    if (ownAddress === toAddress) {
+      throw new BadRequestException('CANNOT_SEND_TO_SELF');
+    }
   }
 
   private parseAmount(raw: string): bigint {

@@ -7,6 +7,7 @@ const _messages = <String, String>{
   'AMOUNT_NOT_REPRESENTABLE_ON_CHAIN':
       'The TRON network settles six decimal places, so this amount cannot be sent',
   'INSUFFICIENT_BALANCE': 'Your balance is too low for this transfer',
+  'CANNOT_SEND_TO_SELF': 'This is your own address, choose a different recipient',
   'IDEMPOTENCY_KEY_REQUIRED': 'The request was missing its idempotency key',
 };
 

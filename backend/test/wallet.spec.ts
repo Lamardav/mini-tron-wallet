@@ -223,3 +223,33 @@ describe('WalletService.send', () => {
     expect(result.txHash).toBe('hash-1');
   });
 });
+
+describe('WalletService self transfer', () => {
+  const request = { toAddress: OUR_ADDRESS, amountNano: '123456000' };
+
+  it('refuses to send a transfer to the sender own address', async () => {
+    const context = makeWalletService();
+    context.prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      address: OUR_ADDRESS,
+      encryptedPrivateKey: 'encrypted',
+    });
+    context.prisma.transaction.findUnique.mockResolvedValue(null);
+
+    await expect(context.service.send('user-1', request, 'key-1')).rejects.toThrow(
+      'CANNOT_SEND_TO_SELF',
+    );
+    expect(context.tron.getBalanceNano).not.toHaveBeenCalled();
+  });
+
+  it('refuses to estimate a transfer to the sender own address', async () => {
+    const context = makeWalletService();
+    context.prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      address: OUR_ADDRESS,
+      encryptedPrivateKey: 'encrypted',
+    });
+
+    await expect(context.service.estimate('user-1', request)).rejects.toThrow(
+      'CANNOT_SEND_TO_SELF',
+    );
+  });
+});
