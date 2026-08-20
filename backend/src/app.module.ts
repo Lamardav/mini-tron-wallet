@@ -7,6 +7,7 @@ import { CryptoModule } from './crypto/crypto.module';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { TronModule } from './tron/tron.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TronModule } from './tron/tron.module';
     CryptoModule,
     TronModule,
     AuthModule,
+    WalletModule,
   ],
   controllers: [HealthController],
 })
