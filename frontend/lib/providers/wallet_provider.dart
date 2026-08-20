@@ -6,7 +6,7 @@ import '../core/api_client.dart';
 import '../core/error_messages.dart';
 import 'auth_provider.dart';
 
-const pollInterval = Duration(seconds: 5);
+const retryDelay = Duration(seconds: 3);
 
 BigInt? _optionalBigInt(dynamic value) {
   return value == null ? null : BigInt.parse(value as String);
@@ -121,40 +121,71 @@ class WalletState {
 }
 
 class WalletNotifier extends Notifier<WalletState> {
+  int _version = -1;
+  bool _watching = false;
+
   @override
   WalletState build() {
-    final timer = Timer.periodic(pollInterval, (_) => refresh());
-    ref.onDispose(timer.cancel);
+    _watching = true;
+    ref.onDispose(() => _watching = false);
 
-    refresh();
+    unawaited(_watch());
 
     return const WalletState();
   }
 
-  Future<void> refresh() async {
-    final api = ref.read(apiClientProvider);
+  Future<void> refresh() => _pull();
 
+  Future<void> _watch() async {
+    while (_watching && ref.mounted) {
+      final delivered = await _pull();
+
+      if (!delivered) {
+        await Future<void>.delayed(retryDelay);
+      }
+    }
+  }
+
+  Future<bool> _pull() async {
     try {
-      final overview = await api.get('/wallet') as Map<String, dynamic>;
-      final history = await api.get('/wallet/transactions') as List<dynamic>;
+      final payload = await ref.read(apiClientProvider).get('/wallet/updates?since=$_version');
+      final update = payload as Map<String, dynamic>;
+      _version = update['version'] as int;
 
       if (!ref.mounted) {
-        return;
+        return true;
       }
 
-      state = WalletState(
-        address: overview['address'] as String,
-        balanceNano: BigInt.parse(overview['balanceNano'] as String),
-        transactions: history
-            .map((item) => WalletTransaction.fromJson(item as Map<String, dynamic>))
-            .toList(),
-        loading: false,
-      );
+      if (update['changed'] == true) {
+        _apply(update);
+      } else if (state.loading) {
+        state = state.copyWith(loading: false);
+      }
+
+      return true;
     } on ApiException catch (error) {
       if (ref.mounted) {
         state = state.copyWith(loading: false, error: humanizeError(error.message));
       }
+
+      return false;
+    } catch (_) {
+      return false;
     }
+  }
+
+  void _apply(Map<String, dynamic> update) {
+    final overview = update['wallet'] as Map<String, dynamic>;
+    final history = update['transactions'] as List<dynamic>;
+
+    state = WalletState(
+      address: overview['address'] as String,
+      balanceNano: BigInt.parse(overview['balanceNano'] as String),
+      transactions: history
+          .map((item) => WalletTransaction.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      loading: false,
+    );
   }
 
   Future<FeeEstimate> estimate({

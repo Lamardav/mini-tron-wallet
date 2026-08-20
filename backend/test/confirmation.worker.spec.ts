@@ -13,18 +13,21 @@ function makeWorker() {
     ),
   };
   const tron = { getConfirmation: jest.fn(), getBalanceNano: jest.fn().mockResolvedValue(5_000_000_000n) };
+  const events = { bump: jest.fn() };
 
   return {
     prisma,
     tron,
+    events,
     transactionsInTx,
     outboxInTx,
-    worker: new ConfirmationWorker(prisma as never, tron as never),
+    worker: new ConfirmationWorker(prisma as never, tron as never, events as never),
   };
 }
 
 const pendingTransaction = {
   id: 'tx-1',
+  userId: 'user-1',
   amountNano: 500_000_000n,
   txHash: 'hash-1',
   createdAt: new Date(),

@@ -11,8 +11,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TronService } from '../tron/tron.service';
 import { SendDto } from './dto';
 import { toTransactionResponse, TransactionRecord, TransactionResponse } from './transaction.mapper';
+import { WalletEventsService } from './wallet-events.service';
 
 const HISTORY_LIMIT = 100;
+const UPDATE_HOLD_MS = 25_000;
 
 interface WalletKeys {
   address: string;
@@ -27,7 +29,23 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly tron: TronService,
     private readonly crypto: CryptoService,
+    private readonly events: WalletEventsService,
   ) {}
+
+  async waitForUpdate(userId: string, since: number) {
+    const version = await this.events.waitForChange(userId, since, UPDATE_HOLD_MS);
+
+    if (version === null) {
+      return { version: this.events.versionFor(userId), changed: false };
+    }
+
+    const [wallet, transactions] = await Promise.all([
+      this.overview(userId),
+      this.history(userId),
+    ]);
+
+    return { version, changed: true, wallet, transactions };
+  }
 
   async overview(userId: string) {
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
@@ -115,7 +133,10 @@ export class WalletService {
       return toTransactionResponse(owned as TransactionRecord);
     }
 
-    return toTransactionResponse(await this.signAndBroadcast(transaction, wallet, dto, amountNano));
+    const sent = await this.signAndBroadcast(transaction, wallet, dto, amountNano);
+    this.events.bump(userId);
+
+    return toTransactionResponse(sent);
   }
 
   private parseAmount(raw: string): bigint {

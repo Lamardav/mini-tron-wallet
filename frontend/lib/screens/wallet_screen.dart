@@ -8,6 +8,7 @@ import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
 import '../widgets/amount_text.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/transaction_tile.dart';
 
 class WalletScreen extends ConsumerWidget {
@@ -44,14 +45,10 @@ class WalletScreen extends ConsumerWidget {
                       duration: baseDuration,
                       switchInCurve: enterCurve,
                       child: wallet.balanceNano == null
-                          ? Text(
-                              'Loading',
-                              key: const ValueKey<String>('loading'),
-                              style: TextStyle(
-                                fontFamily: monoFamily,
-                                fontSize: 30,
-                                color: palette.inkFaint,
-                              ),
+                          ? const Padding(
+                              key: ValueKey<String>('loading'),
+                              padding: EdgeInsets.symmetric(vertical: 6),
+                              child: Skeleton(width: 240, height: 26),
                             )
                           : AmountText(
                               key: ValueKey<String>(wallet.balanceNano.toString()),
@@ -62,13 +59,24 @@ class WalletScreen extends ConsumerWidget {
                     const SizedBox(height: 24),
                     const _Label('Address'),
                     const SizedBox(height: 6),
-                    SelectableText(
-                      wallet.address ?? '',
-                      style: TextStyle(
-                        fontFamily: monoFamily,
-                        fontSize: 14,
-                        color: palette.ink,
-                      ),
+                    AnimatedSwitcher(
+                      duration: baseDuration,
+                      switchInCurve: enterCurve,
+                      child: wallet.address == null
+                          ? const Padding(
+                              key: ValueKey<String>('loading'),
+                              padding: EdgeInsets.symmetric(vertical: 2),
+                              child: Skeleton(width: 320, height: 15),
+                            )
+                          : SelectableText(
+                              wallet.address!,
+                              key: const ValueKey<String>('address'),
+                              style: TextStyle(
+                                fontFamily: monoFamily,
+                                fontSize: 14,
+                                color: palette.ink,
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -118,7 +126,13 @@ class WalletScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (wallet.loading && recent.isEmpty)
-                          const _Hint('Loading')
+                          const Column(
+                            children: [
+                              TransactionSkeleton(),
+                              TransactionSkeleton(),
+                              TransactionSkeleton(),
+                            ],
+                          )
                         else if (recent.isEmpty)
                           const _Hint(
                             'Nothing here yet. Fund this address from the Nile faucet to get started.',

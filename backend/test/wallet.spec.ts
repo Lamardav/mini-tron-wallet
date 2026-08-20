@@ -23,12 +23,14 @@ function makeWalletService() {
     broadcast: jest.fn().mockResolvedValue(undefined),
   };
   const crypto = { decrypt: jest.fn().mockReturnValue('plain-private-key') };
+  const events = { bump: jest.fn(), versionFor: jest.fn().mockReturnValue(0), waitForChange: jest.fn() };
 
   return {
     prisma,
     tron,
     crypto,
-    service: new WalletService(prisma as never, tron as never, crypto as never),
+    events,
+    service: new WalletService(prisma as never, tron as never, crypto as never, events as never),
   };
 }
 

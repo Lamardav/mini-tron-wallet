@@ -20,7 +20,7 @@ function makeWorker() {
     getBlockTransfers: jest.fn().mockResolvedValue([]),
   };
 
-  return { prisma, tron, worker: new IncomingScannerWorker(prisma as never, tron as never) };
+  return { prisma, tron, worker: new IncomingScannerWorker(prisma as never, tron as never, { bump: jest.fn() } as never) };
 }
 
 describe('IncomingScannerWorker.tick', () => {

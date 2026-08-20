@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { TronService } from '../tron/tron.service';
+import { WalletEventsService } from '../wallet/wallet-events.service';
 
 const POLL_INTERVAL_MS = 5_000;
 const BATCH_SIZE = 25;
@@ -10,6 +11,7 @@ const UNCONFIRMED_TIMEOUT_MS = 10 * 60_000;
 
 export interface PendingTransaction {
   id: string;
+  userId: string;
   amountNano: bigint;
   txHash: string | null;
   createdAt: Date;
@@ -23,6 +25,7 @@ export class ConfirmationWorker {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tron: TronService,
+    private readonly events: WalletEventsService,
   ) {}
 
   @Interval(POLL_INTERVAL_MS)
@@ -52,6 +55,7 @@ export class ConfirmationWorker {
     if (!transaction.txHash) {
       if (age > MISSING_HASH_TIMEOUT_MS) {
         await this.markFailed(transaction.id);
+        this.events.bump(transaction.userId);
       }
 
       return;
@@ -67,6 +71,7 @@ export class ConfirmationWorker {
 
     if (report.status === 'failed' || age > UNCONFIRMED_TIMEOUT_MS) {
       await this.markFailed(transaction.id);
+      this.events.bump(transaction.userId);
     }
   }
 
@@ -86,6 +91,8 @@ export class ConfirmationWorker {
       if (updated.count === 0) {
         return;
       }
+
+      this.events.bump(transaction.userId);
 
       await db.outboxEvent.create({
         data: {

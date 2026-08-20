@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt.guard';
 import { SendDto } from './dto';
 import { WalletService } from './wallet.service';
@@ -20,6 +30,11 @@ export class WalletController {
   @Get('transactions')
   history(@Req() request: AuthenticatedRequest) {
     return this.wallet.history(request.user.id);
+  }
+
+  @Get('updates')
+  updates(@Req() request: AuthenticatedRequest, @Query('since') since?: string) {
+    return this.wallet.waitForUpdate(request.user.id, Number(since ?? 0) || 0);
   }
 
   @HttpCode(200)

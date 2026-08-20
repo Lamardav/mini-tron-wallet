@@ -5,6 +5,7 @@ import '../design/motion.dart';
 import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/transaction_tile.dart';
 
 class TransactionsScreen extends ConsumerWidget {
@@ -38,11 +39,20 @@ class TransactionsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (wallet.transactions.isEmpty)
+                  if (wallet.loading && wallet.transactions.isEmpty)
+                    const Column(
+                      children: [
+                        TransactionSkeleton(),
+                        TransactionSkeleton(),
+                        TransactionSkeleton(),
+                        TransactionSkeleton(),
+                      ],
+                    )
+                  else if (wallet.transactions.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Text(
-                        wallet.loading ? 'Loading' : 'No transactions yet',
+                        'No transactions yet',
                         style: TextStyle(
                           fontFamily: sansFamily,
                           fontSize: 14,

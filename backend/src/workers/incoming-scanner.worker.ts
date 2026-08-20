@@ -3,6 +3,7 @@ import { Interval } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IncomingTransfer, TronService } from '../tron/tron.service';
+import { WalletEventsService } from '../wallet/wallet-events.service';
 
 const POLL_INTERVAL_MS = 5_000;
 const MAX_BLOCKS_PER_PASS = 20n;
@@ -15,6 +16,7 @@ export class IncomingScannerWorker {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tron: TronService,
+    private readonly events: WalletEventsService,
   ) {}
 
   @Interval(POLL_INTERVAL_MS)
@@ -82,6 +84,8 @@ export class IncomingScannerWorker {
           txHash: transfer.txHash,
         },
       });
+
+      this.events.bump(wallet.userId);
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
         throw error;
