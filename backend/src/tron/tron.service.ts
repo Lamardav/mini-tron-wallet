@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TronWeb } from 'tronweb';
+import { providers, TronWeb } from 'tronweb';
 import { nanoToSun, sunToNano } from '../common/amount';
 import { calculateFee } from './fee';
+import { isTransientRpcError } from './retry';
 import {
   ConfirmationStatus,
   parseBlockTransfers,
@@ -14,6 +15,11 @@ export type { ConfirmationStatus };
 const SIGNATURE_OVERHEAD_BYTES = 67;
 const DEFAULT_BANDWIDTH_PRICE_SUN = 1000n;
 const DEFAULT_ACTIVATION_SUN = 1_000_000n;
+const RPC_TIMEOUT_MS = 8000;
+const READ_ATTEMPTS = 3;
+const RETRY_BACKOFF_MS = 300;
+
+type RpcProvider = InstanceType<typeof providers.HttpProvider>;
 
 export interface ConfirmationReport {
   status: ConfirmationStatus;
@@ -48,6 +54,7 @@ export interface IncomingTransfer {
 
 @Injectable()
 export class TronService {
+  private readonly logger = new Logger(TronService.name);
   private readonly tronWeb: TronWeb;
   private readonly fullHost: string;
 
@@ -58,7 +65,34 @@ export class TronService {
     const apiKey = config.getOrThrow<string>('CHAINSTACK_API_KEY');
 
     this.fullHost = `${endpoint}/${apiKey}`;
-    this.tronWeb = new TronWeb({ fullHost: this.fullHost });
+    this.tronWeb = new TronWeb({ fullHost: this.provider() });
+  }
+
+  private provider(): RpcProvider {
+    return new providers.HttpProvider(this.fullHost, RPC_TIMEOUT_MS);
+  }
+
+  private async read<T>(label: string, call: () => Promise<T>): Promise<T> {
+    let attempt = 1;
+
+    for (;;) {
+      try {
+        return await call();
+      } catch (error) {
+        if (attempt === READ_ATTEMPTS || !isTransientRpcError(error)) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `${label} did not answer on attempt ${attempt}, retrying`,
+        );
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, RETRY_BACKOFF_MS * attempt),
+        );
+        attempt += 1;
+      }
+    }
   }
 
   isValidAddress(address: string): boolean {
@@ -72,7 +106,9 @@ export class TronService {
   }
 
   async getBalanceNano(address: string): Promise<bigint> {
-    const sun = await this.tronWeb.trx.getBalance(address);
+    const sun = await this.read('getBalance', () =>
+      this.tronWeb.trx.getBalance(address),
+    );
 
     return sunToNano(BigInt(sun));
   }
@@ -87,7 +123,7 @@ export class TronService {
     amountNano: bigint,
   ): Promise<string> {
     const sender = new TronWeb({
-      fullHost: this.fullHost,
+      fullHost: this.provider(),
       privateKey,
     });
 
@@ -109,14 +145,20 @@ export class TronService {
     amountNano: bigint,
   ): Promise<PreparedTransfer> {
     const [transaction, resources, parameters, recipient] = await Promise.all([
-      this.tronWeb.transactionBuilder.sendTrx(
-        to,
-        Number(nanoToSun(amountNano)),
-        from,
+      this.read('sendTrx', () =>
+        this.tronWeb.transactionBuilder.sendTrx(
+          to,
+          Number(nanoToSun(amountNano)),
+          from,
+        ),
       ),
-      this.tronWeb.trx.getAccountResources(from),
-      this.tronWeb.trx.getChainParameters(),
-      this.tronWeb.trx.getAccount(to),
+      this.read('getAccountResources', () =>
+        this.tronWeb.trx.getAccountResources(from),
+      ),
+      this.read('getChainParameters', () =>
+        this.tronWeb.trx.getChainParameters(),
+      ),
+      this.read('getAccount', () => this.tronWeb.trx.getAccount(to)),
     ]);
 
     const rawDataHex =
@@ -186,7 +228,9 @@ export class TronService {
   }
 
   async getConfirmation(txHash: string): Promise<ConfirmationReport> {
-    const info = await this.tronWeb.trx.getTransactionInfo(txHash);
+    const info = await this.read('getTransactionInfo', () =>
+      this.tronWeb.trx.getTransactionInfo(txHash),
+    );
     const record = info as { fee?: number; blockNumber?: number } | null;
 
     return {
@@ -198,13 +242,17 @@ export class TronService {
   }
 
   async getLatestBlockNumber(): Promise<bigint> {
-    const block = await this.tronWeb.trx.getCurrentBlock();
+    const block = await this.read('getCurrentBlock', () =>
+      this.tronWeb.trx.getCurrentBlock(),
+    );
 
     return BigInt(block.block_header.raw_data.number);
   }
 
   async getBlockTransfers(blockNumber: bigint): Promise<IncomingTransfer[]> {
-    const block = await this.tronWeb.trx.getBlock(Number(blockNumber));
+    const block = await this.read('getBlock', () =>
+      this.tronWeb.trx.getBlock(Number(blockNumber)),
+    );
 
     return parseBlockTransfers(block).map((transfer) => ({
       txHash: transfer.txHash,
