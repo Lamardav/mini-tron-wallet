@@ -2,8 +2,6 @@ node_modules/
 dist/
 coverage/
 .env
-.claude/
-docs/superpowers/
 frontend/build/
 frontend/.dart_tool/
 frontend/.idea/
