@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Direction {
+  incoming
+  outgoing
+}
+
+enum TxStatus {
+  pending
+  confirmed
+  failed
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  wallet       Wallet?
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id                  String   @id @default(uuid())
+  userId              String   @unique @map("user_id")
+  address             String   @unique
+  encryptedPrivateKey String   @map("encrypted_private_key")
+  createdAt           DateTime @default(now()) @map("created_at")
+  user                User     @relation(fields: [userId], references: [id])
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  direction      Direction
+  amountNano     BigInt    @map("amount")
+  address        String
+  status         TxStatus  @default(pending)
+  txHash         String?   @map("tx_hash")
+  idempotencyKey String?   @map("idempotency_key")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, idempotencyKey])
+  @@unique([userId, txHash, direction])
+  @@index([status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("transactions")
+}
+
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  topic       String
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([publishedAt])
+  @@map("outbox_events")
+}
+
+model SyncState {
+  id               Int    @id
+  lastScannedBlock BigInt @map("last_scanned_block")
+
+  @@map("sync_state")
+}
