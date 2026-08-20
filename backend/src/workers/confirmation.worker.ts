@@ -13,6 +13,7 @@ export interface PendingTransaction {
   amountNano: bigint;
   txHash: string | null;
   createdAt: Date;
+  user?: { wallet: { address: string } | null } | null;
 }
 
 @Injectable()
@@ -33,6 +34,7 @@ export class ConfirmationWorker {
     const pending = (await this.prisma.transaction.findMany({
       where: { status: 'pending' },
       take: BATCH_SIZE,
+      include: { user: { include: { wallet: true } } },
     })) as PendingTransaction[];
 
     for (const transaction of pending) {
@@ -55,24 +57,30 @@ export class ConfirmationWorker {
       return;
     }
 
-    const status = await this.tron.getConfirmation(transaction.txHash);
+    const report = await this.tron.getConfirmation(transaction.txHash);
 
-    if (status === 'confirmed') {
-      await this.markConfirmed(transaction);
+    if (report.status === 'confirmed') {
+      await this.markConfirmed(transaction, report.feeNano, report.blockNumber);
 
       return;
     }
 
-    if (status === 'failed' || age > UNCONFIRMED_TIMEOUT_MS) {
+    if (report.status === 'failed' || age > UNCONFIRMED_TIMEOUT_MS) {
       await this.markFailed(transaction.id);
     }
   }
 
-  private async markConfirmed(transaction: PendingTransaction) {
+  private async markConfirmed(
+    transaction: PendingTransaction,
+    feeNano: bigint | null,
+    blockNumber: bigint | null,
+  ) {
+    const balanceAfterNano = await this.readBalance(transaction);
+
     await this.prisma.$transaction(async (db) => {
       const updated = await db.transaction.updateMany({
         where: { id: transaction.id, status: 'pending' },
-        data: { status: 'confirmed' },
+        data: { status: 'confirmed', feeNano, blockNumber, balanceAfterNano },
       });
 
       if (updated.count === 0) {
@@ -90,6 +98,22 @@ export class ConfirmationWorker {
         },
       });
     });
+  }
+
+  private async readBalance(transaction: PendingTransaction): Promise<bigint | null> {
+    const address = transaction.user?.wallet?.address;
+
+    if (!address) {
+      return null;
+    }
+
+    try {
+      return await this.tron.getBalanceNano(address);
+    } catch (error) {
+      this.logger.warn(`Could not read the balance for ${address}: ${(error as Error).message}`);
+
+      return null;
+    }
   }
 
   private async markFailed(id: string) {

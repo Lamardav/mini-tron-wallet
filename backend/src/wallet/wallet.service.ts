@@ -99,7 +99,13 @@ export class WalletService {
       throw new UnprocessableEntityException('INSUFFICIENT_BALANCE');
     }
 
-    const transaction = await this.claimTransaction(userId, dto, amountNano, idempotencyKey);
+    const transaction = await this.claimTransaction(
+      userId,
+      dto,
+      amountNano,
+      idempotencyKey,
+      balanceNano,
+    );
 
     if (!transaction) {
       const owned = await this.prisma.transaction.findUniqueOrThrow({
@@ -129,6 +135,7 @@ export class WalletService {
     dto: SendDto,
     amountNano: bigint,
     idempotencyKey: string,
+    balanceBeforeNano: bigint,
   ): Promise<TransactionRecord | null> {
     try {
       return (await this.prisma.transaction.create({
@@ -139,6 +146,7 @@ export class WalletService {
           address: dto.toAddress,
           status: 'pending',
           idempotencyKey,
+          balanceBeforeNano,
         },
       })) as TransactionRecord;
     } catch (error) {

@@ -8,6 +8,10 @@ import 'auth_provider.dart';
 
 const pollInterval = Duration(seconds: 5);
 
+BigInt? _optionalBigInt(dynamic value) {
+  return value == null ? null : BigInt.parse(value as String);
+}
+
 class WalletTransaction {
   const WalletTransaction({
     required this.id,
@@ -16,6 +20,11 @@ class WalletTransaction {
     required this.address,
     required this.status,
     required this.txHash,
+    required this.feeNano,
+    required this.balanceBeforeNano,
+    required this.balanceAfterNano,
+    required this.blockNumber,
+    required this.createdAt,
   });
 
   factory WalletTransaction.fromJson(Map<String, dynamic> json) {
@@ -26,6 +35,11 @@ class WalletTransaction {
       address: json['address'] as String,
       status: json['status'] as String,
       txHash: json['txHash'] as String?,
+      feeNano: _optionalBigInt(json['feeNano']),
+      balanceBeforeNano: _optionalBigInt(json['balanceBeforeNano']),
+      balanceAfterNano: _optionalBigInt(json['balanceAfterNano']),
+      blockNumber: json['blockNumber'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
     );
   }
 
@@ -35,8 +49,15 @@ class WalletTransaction {
   final String address;
   final String status;
   final String? txHash;
+  final BigInt? feeNano;
+  final BigInt? balanceBeforeNano;
+  final BigInt? balanceAfterNano;
+  final String? blockNumber;
+  final DateTime createdAt;
 
   bool get incoming => direction == 'incoming';
+
+  bool get settled => status == 'confirmed';
 }
 
 class FeeEstimate {

@@ -61,6 +61,10 @@ describe('WalletService.history', () => {
         address: RECIPIENT,
         status: 'pending',
         txHash: null,
+        feeNano: null,
+        balanceBeforeNano: null,
+        balanceAfterNano: null,
+        blockNumber: null,
         createdAt: new Date('2026-08-20T10:00:00.000Z'),
       },
     ]);
@@ -89,6 +93,10 @@ describe('WalletService.send', () => {
     status: 'pending',
     txHash: null,
     idempotencyKey: 'key-1',
+    feeNano: null,
+    balanceBeforeNano: null,
+    balanceAfterNano: null,
+    blockNumber: null,
     createdAt: new Date('2026-08-20T10:00:00.000Z'),
   };
 

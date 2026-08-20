@@ -11,6 +11,12 @@ const SIGNATURE_OVERHEAD_BYTES = 67;
 const DEFAULT_BANDWIDTH_PRICE_SUN = 1000n;
 const DEFAULT_ACTIVATION_SUN = 1_000_000n;
 
+export interface ConfirmationReport {
+  status: ConfirmationStatus;
+  feeNano: bigint | null;
+  blockNumber: bigint | null;
+}
+
 export interface FeeEstimate {
   bandwidthNano: bigint;
   activationNano: bigint;
@@ -129,8 +135,15 @@ export class TronService {
     }
   }
 
-  async getConfirmation(txHash: string): Promise<ConfirmationStatus> {
-    return resolveConfirmationStatus(await this.tronWeb.trx.getTransactionInfo(txHash));
+  async getConfirmation(txHash: string): Promise<ConfirmationReport> {
+    const info = await this.tronWeb.trx.getTransactionInfo(txHash);
+    const record = info as { fee?: number; blockNumber?: number } | null;
+
+    return {
+      status: resolveConfirmationStatus(info),
+      feeNano: record?.fee === undefined ? null : sunToNano(BigInt(record.fee)),
+      blockNumber: record?.blockNumber === undefined ? null : BigInt(record.blockNumber),
+    };
   }
 
   async getLatestBlockNumber(): Promise<bigint> {

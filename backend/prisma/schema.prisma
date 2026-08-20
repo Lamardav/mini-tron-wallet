@@ -41,16 +41,20 @@ model Wallet {
 }
 
 model Transaction {
-  id             String    @id @default(uuid())
-  userId         String    @map("user_id")
-  direction      Direction
-  amountNano     BigInt    @map("amount")
-  address        String
-  status         TxStatus  @default(pending)
-  txHash         String?   @map("tx_hash")
-  idempotencyKey String?   @map("idempotency_key")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  user           User      @relation(fields: [userId], references: [id])
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  direction         Direction
+  amountNano        BigInt    @map("amount")
+  address           String
+  status            TxStatus  @default(pending)
+  txHash            String?   @map("tx_hash")
+  idempotencyKey    String?   @map("idempotency_key")
+  feeNano           BigInt?   @map("fee")
+  balanceBeforeNano BigInt?   @map("balance_before")
+  balanceAfterNano  BigInt?   @map("balance_after")
+  blockNumber       BigInt?   @map("block_number")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  user              User      @relation(fields: [userId], references: [id])
 
   @@unique([userId, idempotencyKey])
   @@unique([userId, txHash, direction])

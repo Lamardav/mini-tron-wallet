@@ -12,7 +12,7 @@ function makeWorker() {
       run({ transaction: transactionsInTx, outboxEvent: outboxInTx }),
     ),
   };
-  const tron = { getConfirmation: jest.fn() };
+  const tron = { getConfirmation: jest.fn(), getBalanceNano: jest.fn().mockResolvedValue(5_000_000_000n) };
 
   return {
     prisma,
@@ -37,13 +37,18 @@ function minutesAgo(minutes: number): Date {
 describe('ConfirmationWorker.resolve', () => {
   it('confirms a transaction and records one outbox event', async () => {
     const { tron, worker, transactionsInTx, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue('confirmed');
+    tron.getConfirmation.mockResolvedValue({ status: 'confirmed', feeNano: 100000000n, blockNumber: 70000000n });
 
     await worker.resolve(pendingTransaction);
 
     expect(transactionsInTx.updateMany).toHaveBeenCalledWith({
       where: { id: 'tx-1', status: 'pending' },
-      data: { status: 'confirmed' },
+      data: {
+        status: 'confirmed',
+        feeNano: 100000000n,
+        blockNumber: 70000000n,
+        balanceAfterNano: null,
+      },
     });
     expect(outboxInTx.create).toHaveBeenCalledWith({
       data: {
@@ -59,7 +64,7 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('does not publish twice when another worker already confirmed it', async () => {
     const { tron, worker, transactionsInTx, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue('confirmed');
+    tron.getConfirmation.mockResolvedValue({ status: 'confirmed', feeNano: 100000000n, blockNumber: 70000000n });
     transactionsInTx.updateMany.mockResolvedValue({ count: 0 });
 
     await worker.resolve(pendingTransaction);
@@ -69,7 +74,7 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('marks a rejected transaction failed without publishing', async () => {
     const { prisma, tron, worker, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue('failed');
+    tron.getConfirmation.mockResolvedValue({ status: 'failed', feeNano: 100000000n, blockNumber: 70000000n });
 
     await worker.resolve(pendingTransaction);
 
@@ -82,7 +87,7 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('leaves a fresh unconfirmed transaction alone', async () => {
     const { prisma, tron, worker } = makeWorker();
-    tron.getConfirmation.mockResolvedValue('pending');
+    tron.getConfirmation.mockResolvedValue({ status: 'pending', feeNano: 100000000n, blockNumber: 70000000n });
 
     await worker.resolve(pendingTransaction);
 
@@ -91,7 +96,7 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('gives up on a transaction still unconfirmed after ten minutes', async () => {
     const { prisma, tron, worker } = makeWorker();
-    tron.getConfirmation.mockResolvedValue('pending');
+    tron.getConfirmation.mockResolvedValue({ status: 'pending', feeNano: 100000000n, blockNumber: 70000000n });
 
     await worker.resolve({ ...pendingTransaction, createdAt: minutesAgo(11) });
 
@@ -128,7 +133,7 @@ describe('ConfirmationWorker.tick', () => {
     ]);
     tron.getConfirmation
       .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce('confirmed');
+      .mockResolvedValueOnce({ status: 'confirmed', feeNano: 0n, blockNumber: 1n });
 
     await worker.tick();
 
@@ -143,5 +148,56 @@ describe('ConfirmationWorker.tick', () => {
     process.env.WORKERS_ENABLED = 'true';
 
     expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConfirmationWorker balance snapshot', () => {
+  it('stores the balance observed right after confirmation', async () => {
+    const { tron, worker, transactionsInTx } = makeWorker();
+    tron.getConfirmation.mockResolvedValue({
+      status: 'confirmed',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
+
+    await worker.resolve({
+      ...pendingTransaction,
+      user: { wallet: { address: 'TVTqhMdd6mSQ3VanpwZvAn3H3zsUG8v7Ay' } },
+    });
+
+    expect(transactionsInTx.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tx-1', status: 'pending' },
+      data: {
+        status: 'confirmed',
+        feeNano: 100000000n,
+        blockNumber: 70000000n,
+        balanceAfterNano: 5_000_000_000n,
+      },
+    });
+  });
+
+  it('still confirms when the balance cannot be read', async () => {
+    const { tron, worker, transactionsInTx } = makeWorker();
+    tron.getConfirmation.mockResolvedValue({
+      status: 'confirmed',
+      feeNano: null,
+      blockNumber: null,
+    });
+    tron.getBalanceNano.mockRejectedValue(new Error('network down'));
+
+    await worker.resolve({
+      ...pendingTransaction,
+      user: { wallet: { address: 'TVTqhMdd6mSQ3VanpwZvAn3H3zsUG8v7Ay' } },
+    });
+
+    expect(transactionsInTx.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tx-1', status: 'pending' },
+      data: {
+        status: 'confirmed',
+        feeNano: null,
+        blockNumber: null,
+        balanceAfterNano: null,
+      },
+    });
   });
 });
