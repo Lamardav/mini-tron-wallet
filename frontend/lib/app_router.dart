@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,12 +14,25 @@ import 'widgets/wallet_shell.dart';
 const _splashRoute = '/';
 const _publicRoutes = {'/login', '/register'};
 
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier(Ref ref) {
+    ref.listen(authProvider, (previous, next) {
+      if (previous?.restored != next.restored || previous?.signedIn != next.signedIn) {
+        notifyListeners();
+      }
+    });
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
+  final authChanges = _AuthChangeNotifier(ref);
+  ref.onDispose(authChanges.dispose);
 
   return GoRouter(
     initialLocation: _splashRoute,
+    refreshListenable: authChanges,
     redirect: (context, state) {
+      final auth = ref.read(authProvider);
       final location = state.matchedLocation;
 
       if (!auth.restored) {
