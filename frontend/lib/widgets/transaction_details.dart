@@ -91,7 +91,7 @@ class TransactionDetails extends StatelessWidget {
                 child: _Copyable(text: transaction.address),
               ),
               _Row(
-                label: 'Network fee',
+                label: transaction.incoming ? 'Network fee, paid by the sender' : 'Network fee',
                 child: transaction.feeNano == null
                     ? _Muted(transaction.settled ? 'not reported' : 'known once confirmed')
                     : AmountText(amountNano: transaction.feeNano!, fontSize: 13),
