@@ -1,3 +1,31 @@
+export type ConfirmationStatus = 'pending' | 'confirmed' | 'failed';
+
+interface TransactionInfo {
+  blockNumber?: number;
+  result?: string;
+  receipt?: { result?: string };
+}
+
+export function resolveConfirmationStatus(info: unknown): ConfirmationStatus {
+  const record = info as TransactionInfo | null | undefined;
+
+  if (!record || record.blockNumber === undefined) {
+    return 'pending';
+  }
+
+  if (record.result === 'FAILED') {
+    return 'failed';
+  }
+
+  const executionResult = record.receipt?.result;
+
+  if (executionResult !== undefined && executionResult !== 'SUCCESS') {
+    return 'failed';
+  }
+
+  return 'confirmed';
+}
+
 export interface BlockTransfer {
   txHash: string;
   fromHex: string;

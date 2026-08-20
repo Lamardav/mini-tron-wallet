@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TronWeb } from 'tronweb';
 import { nanoToSun, sunToNano } from '../common/amount';
-import { parseBlockTransfers } from './tron.parse';
+import { ConfirmationStatus, parseBlockTransfers, resolveConfirmationStatus } from './tron.parse';
 
-export type ConfirmationStatus = 'pending' | 'confirmed' | 'failed';
+export type { ConfirmationStatus };
 
 export interface SignedTransfer {
   txHash: string;
@@ -70,15 +70,7 @@ export class TronService {
   }
 
   async getConfirmation(txHash: string): Promise<ConfirmationStatus> {
-    const info = await this.tronWeb.trx.getTransactionInfo(txHash);
-
-    if (!info || info.blockNumber === undefined) {
-      return 'pending';
-    }
-
-    return (info as { receipt?: { result?: string } }).receipt?.result === 'SUCCESS'
-      ? 'confirmed'
-      : 'failed';
+    return resolveConfirmationStatus(await this.tronWeb.trx.getTransactionInfo(txHash));
   }
 
   async getLatestBlockNumber(): Promise<bigint> {
