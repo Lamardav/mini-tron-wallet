@@ -12,6 +12,13 @@ echo "building the web bundle"
 echo "uploading tracked sources"
 git archive HEAD | ssh "$HOST" "mkdir -p $DIR && tar -x -C $DIR"
 
+echo "dropping files that no longer exist in the repository"
+git ls-files | ssh "$HOST" "cat > $DIR/.manifest"
+ssh "$HOST" "cd $DIR && find . -type f -not -path './frontend/build/*' -not -name .env -not -name .manifest \
+  | sed 's|^\./||' | grep -vxF -f .manifest | xargs -r rm -f \
+  && find . -type d -empty -not -path './frontend/build/*' -delete \
+  && rm -f .manifest"
+
 echo "uploading the web bundle"
 ssh "$HOST" "mkdir -p $DIR/frontend/build/web && find $DIR/frontend/build/web -mindepth 1 -delete"
 tar czf - -C frontend/build web | ssh "$HOST" "tar xzf - -C $DIR/frontend/build"
