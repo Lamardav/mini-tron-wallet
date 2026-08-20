@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/clipboard.dart';
+import '../design/motion.dart';
 import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
@@ -24,92 +25,129 @@ class WalletScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: palette.surface,
-                border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Label('Balance'),
-                  const SizedBox(height: 6),
-                  if (wallet.balanceNano == null)
-                    Text(
-                      'Loading',
-                      style: TextStyle(fontFamily: monoFamily, color: palette.inkFaint),
-                    )
-                  else
-                    AmountText(amountNano: wallet.balanceNano!, fontSize: 30),
-                  const SizedBox(height: 24),
-                  _Label('Address'),
-                  const SizedBox(height: 6),
-                  SelectableText(
-                    wallet.address ?? '',
-                    style: TextStyle(
-                      fontFamily: monoFamily,
-                      fontSize: 14,
-                      color: palette.ink,
+            FadeIn(
+              child: AnimatedContainer(
+                duration: themeDuration,
+                curve: enterCurve,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  border: Border.all(color: palette.border),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Label('Balance'),
+                    const SizedBox(height: 6),
+                    AnimatedSwitcher(
+                      duration: baseDuration,
+                      switchInCurve: enterCurve,
+                      child: wallet.balanceNano == null
+                          ? Text(
+                              'Loading',
+                              key: const ValueKey<String>('loading'),
+                              style: TextStyle(
+                                fontFamily: monoFamily,
+                                fontSize: 30,
+                                color: palette.inkFaint,
+                              ),
+                            )
+                          : AmountText(
+                              key: ValueKey<String>(wallet.balanceNano.toString()),
+                              amountNano: wallet.balanceNano!,
+                              fontSize: 30,
+                            ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: wallet.address == null
-                              ? null
-                              : () => _copyAddress(context, wallet.address!),
-                          child: const Text('COPY'),
-                        ),
+                    const SizedBox(height: 24),
+                    const _Label('Address'),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      wallet.address ?? '',
+                      style: TextStyle(
+                        fontFamily: monoFamily,
+                        fontSize: 14,
+                        color: palette.ink,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => context.go('/send'),
-                          child: const Text('SEND'),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: wallet.address == null
+                                ? null
+                                : () => _copyAddress(context, wallet.address!),
+                            child: const Text('COPY'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => context.go('/send'),
+                            child: const Text('SEND'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 32),
-            Text(
-              'Recent transactions',
-              style: TextStyle(
-                fontFamily: sansFamily,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: palette.ink,
+            FadeIn(
+              delay: const Duration(milliseconds: 80),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Recent transactions',
+                    style: TextStyle(
+                      fontFamily: sansFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: palette.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedSize(
+                    duration: baseDuration,
+                    curve: enterCurve,
+                    alignment: Alignment.topCenter,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (wallet.loading && recent.isEmpty)
+                          const _Hint('Loading')
+                        else if (recent.isEmpty)
+                          const _Hint(
+                            'Nothing here yet. Fund this address from the Nile faucet to get started.',
+                          )
+                        else ...[
+                          for (final transaction in recent) TransactionTile(transaction),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => context.go('/transactions'),
+                            child: const Text('See all transactions'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (wallet.error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      wallet.error!,
+                      style: TextStyle(
+                        fontFamily: sansFamily,
+                        fontSize: 13,
+                        color: palette.failed,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            if (wallet.loading && recent.isEmpty)
-              _Hint('Loading')
-            else if (recent.isEmpty)
-              _Hint('Nothing here yet. Fund this address from the Nile faucet to get started.')
-            else ...[
-              for (final transaction in recent) TransactionTile(transaction),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: () => context.go('/transactions'),
-                  child: const Text('See all transactions'),
-                ),
-              ),
-            ],
-            if (wallet.error != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                wallet.error!,
-                style: TextStyle(fontFamily: sansFamily, fontSize: 13, color: palette.failed),
-              ),
-            ],
           ],
         ),
       ),
@@ -117,13 +155,20 @@ class WalletScreen extends ConsumerWidget {
   }
 
   Future<void> _copyAddress(BuildContext context, String address) async {
-    await Clipboard.setData(ClipboardData(text: address));
+    final copied = await copyToClipboard(address);
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Address copied'), duration: Duration(seconds: 2)),
-      );
+    if (!context.mounted) {
+      return;
     }
+
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(copied ? 'Address copied' : 'Could not reach the clipboard'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 }
 

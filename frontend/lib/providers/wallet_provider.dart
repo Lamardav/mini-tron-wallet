@@ -39,6 +39,34 @@ class WalletTransaction {
   bool get incoming => direction == 'incoming';
 }
 
+class FeeEstimate {
+  const FeeEstimate({
+    required this.feeNano,
+    required this.totalNano,
+    required this.activationNano,
+    required this.coveredByBandwidth,
+    required this.recipientActivated,
+  });
+
+  factory FeeEstimate.fromJson(Map<String, dynamic> json) {
+    return FeeEstimate(
+      feeNano: BigInt.parse(json['feeNano'] as String),
+      totalNano: BigInt.parse(json['totalNano'] as String),
+      activationNano: BigInt.parse(json['activationNano'] as String),
+      coveredByBandwidth: json['coveredByBandwidth'] as bool,
+      recipientActivated: json['recipientActivated'] as bool,
+    );
+  }
+
+  final BigInt feeNano;
+  final BigInt totalNano;
+  final BigInt activationNano;
+  final bool coveredByBandwidth;
+  final bool recipientActivated;
+
+  bool get free => feeNano == BigInt.zero;
+}
+
 class WalletState {
   const WalletState({
     this.address,
@@ -106,6 +134,18 @@ class WalletNotifier extends Notifier<WalletState> {
         state = state.copyWith(loading: false, error: humanizeError(error.message));
       }
     }
+  }
+
+  Future<FeeEstimate> estimate({
+    required String toAddress,
+    required BigInt amountNano,
+  }) async {
+    final payload = await ref.read(apiClientProvider).post('/wallet/estimate', {
+      'toAddress': toAddress,
+      'amountNano': amountNano.toString(),
+    });
+
+    return FeeEstimate.fromJson(payload as Map<String, dynamic>);
   }
 
   Future<WalletTransaction> send({

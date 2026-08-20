@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_router.dart';
+import 'design/motion.dart';
 import 'design/palette.dart';
 import 'design/theme.dart';
 import 'providers/theme_provider.dart';
@@ -21,6 +22,8 @@ class WalletApp extends ConsumerWidget {
       theme: buildTheme(WalletPalette.light, Brightness.light),
       darkTheme: buildTheme(WalletPalette.dark, Brightness.dark),
       themeMode: ref.watch(themeProvider),
+      themeAnimationDuration: themeDuration,
+      themeAnimationCurve: enterCurve,
       routerConfig: ref.watch(routerProvider),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'motion.dart';
 import 'palette.dart';
 
 const sansFamily = 'IBMPlexSans';
@@ -40,19 +41,31 @@ ThemeData buildTheme(WalletPalette palette, Brightness brightness) {
         foregroundColor: palette.page,
         disabledBackgroundColor: palette.borderStrong,
         disabledForegroundColor: palette.page,
+        overlayColor: palette.page,
         elevation: 0,
+        animationDuration: fastDuration,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontFamily: sansFamily, fontWeight: FontWeight.w500),
+        textStyle: const TextStyle(
+          fontFamily: sansFamily,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.3,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: palette.ink,
         side: BorderSide(color: palette.borderStrong),
+        overlayColor: palette.ink,
+        animationDuration: fastDuration,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontFamily: sansFamily, fontWeight: FontWeight.w500),
+        textStyle: const TextStyle(
+          fontFamily: sansFamily,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.3,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(

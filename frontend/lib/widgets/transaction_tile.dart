@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../design/motion.dart';
 import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
@@ -14,7 +15,9 @@ class TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Container(
+    return AnimatedContainer(
+      duration: themeDuration,
+      curve: enterCurve,
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: palette.border)),
@@ -48,13 +51,19 @@ class TransactionTile extends StatelessWidget {
           const SizedBox(width: 12),
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              transaction.status,
+            child: AnimatedDefaultTextStyle(
+              duration: baseDuration,
+              curve: enterCurve,
               style: TextStyle(
                 fontFamily: sansFamily,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: palette.statusColor(transaction.status),
+              ),
+              child: AnimatedSwitcher(
+                duration: baseDuration,
+                switchInCurve: enterCurve,
+                child: Text(transaction.status, key: ValueKey<String>(transaction.status)),
               ),
             ),
           ),

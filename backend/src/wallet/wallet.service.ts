@@ -40,6 +40,29 @@ export class WalletService {
     };
   }
 
+  async estimate(userId: string, dto: SendDto) {
+    if (!this.tron.isValidAddress(dto.toAddress)) {
+      throw new BadRequestException('INVALID_ADDRESS');
+    }
+
+    const amountNano = this.parseAmount(dto.amountNano);
+    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+    const fee = await this.tron.estimateFee(wallet.address, dto.toAddress, amountNano);
+    const totalNano = amountNano + fee.totalNano;
+
+    return {
+      amountNano: amountNano.toString(),
+      feeNano: fee.totalNano.toString(),
+      feeTrx: nanoToTrx(fee.totalNano),
+      activationNano: fee.activationNano.toString(),
+      bandwidthNano: fee.bandwidthNano.toString(),
+      totalNano: totalNano.toString(),
+      totalTrx: nanoToTrx(totalNano),
+      coveredByBandwidth: fee.coveredByBandwidth,
+      recipientActivated: fee.recipientActivated,
+    };
+  }
+
   async history(userId: string): Promise<TransactionResponse[]> {
     const transactions = await this.prisma.transaction.findMany({
       where: { userId },

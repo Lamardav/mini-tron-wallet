@@ -2,9 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TronWeb } from 'tronweb';
 import { nanoToSun, sunToNano } from '../common/amount';
+import { calculateFee } from './fee';
 import { ConfirmationStatus, parseBlockTransfers, resolveConfirmationStatus } from './tron.parse';
 
 export type { ConfirmationStatus };
+
+const SIGNATURE_OVERHEAD_BYTES = 67;
+const DEFAULT_BANDWIDTH_PRICE_SUN = 1000n;
+const DEFAULT_ACTIVATION_SUN = 1_000_000n;
+
+export interface FeeEstimate {
+  bandwidthNano: bigint;
+  activationNano: bigint;
+  totalNano: bigint;
+  coveredByBandwidth: boolean;
+  recipientActivated: boolean;
+}
 
 export interface SignedTransfer {
   txHash: string;
@@ -59,6 +72,53 @@ export class TronService {
     const signed = await this.tronWeb.trx.sign(transaction, privateKey);
 
     return { txHash: signed.txID, signed };
+  }
+
+  async estimateFee(from: string, to: string, amountNano: bigint): Promise<FeeEstimate> {
+    const [transaction, resources, parameters, recipient] = await Promise.all([
+      this.tronWeb.transactionBuilder.sendTrx(to, Number(nanoToSun(amountNano)), from),
+      this.tronWeb.trx.getAccountResources(from),
+      this.tronWeb.trx.getChainParameters(),
+      this.tronWeb.trx.getAccount(to),
+    ]);
+
+    const rawDataHex = (transaction as { raw_data_hex?: string }).raw_data_hex ?? '';
+    const free = (resources.freeNetLimit ?? 0) - (resources.freeNetUsed ?? 0);
+    const staked = (resources.NetLimit ?? 0) - (resources.NetUsed ?? 0);
+
+    const fee = calculateFee({
+      transactionBytes: rawDataHex.length / 2 + SIGNATURE_OVERHEAD_BYTES,
+      availableBandwidth: free + staked,
+      bandwidthPriceSun: this.readParameter(
+        parameters,
+        'getTransactionFee',
+        DEFAULT_BANDWIDTH_PRICE_SUN,
+      ),
+      accountActivationSun: this.readParameter(
+        parameters,
+        'getCreateNewAccountFeeInSystemContract',
+        DEFAULT_ACTIVATION_SUN,
+      ),
+      recipientActivated: Object.keys(recipient ?? {}).length > 0,
+    });
+
+    return {
+      bandwidthNano: sunToNano(fee.bandwidthSun),
+      activationNano: sunToNano(fee.activationSun),
+      totalNano: sunToNano(fee.totalSun),
+      coveredByBandwidth: fee.coveredByBandwidth,
+      recipientActivated: Object.keys(recipient ?? {}).length > 0,
+    };
+  }
+
+  private readParameter(
+    parameters: Array<{ key: string; value: number }>,
+    key: string,
+    fallback: bigint,
+  ): bigint {
+    const found = parameters.find((parameter) => parameter.key === key);
+
+    return found ? BigInt(found.value) : fallback;
   }
 
   async broadcast(signed: object): Promise<void> {

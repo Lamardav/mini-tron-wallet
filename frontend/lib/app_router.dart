@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'design/motion.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -46,15 +47,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       return _publicRoutes.contains(location) || location == _splashRoute ? '/wallet' : null;
     },
     routes: [
-      GoRoute(path: _splashRoute, builder: (context, state) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(
+        path: _splashRoute,
+        pageBuilder: (context, state) => fadePage(state, const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => fadePage(state, const LoginScreen()),
+      ),
+      GoRoute(
+        path: '/register',
+        pageBuilder: (context, state) => fadePage(state, const RegisterScreen()),
+      ),
       ShellRoute(
         builder: (context, state, child) => WalletShell(child: child),
         routes: [
-          GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
-          GoRoute(path: '/send', builder: (context, state) => const SendScreen()),
-          GoRoute(path: '/transactions', builder: (context, state) => const TransactionsScreen()),
+          GoRoute(
+            path: '/wallet',
+            pageBuilder: (context, state) => fadeThroughPage(state, const WalletScreen()),
+          ),
+          GoRoute(
+            path: '/send',
+            pageBuilder: (context, state) => fadeThroughPage(state, const SendScreen()),
+          ),
+          GoRoute(
+            path: '/transactions',
+            pageBuilder: (context, state) => fadeThroughPage(state, const TransactionsScreen()),
+          ),
         ],
       ),
     ],

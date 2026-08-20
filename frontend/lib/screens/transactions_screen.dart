@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../design/motion.dart';
 import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
@@ -30,20 +31,30 @@ class TransactionsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            if (wallet.transactions.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  wallet.loading ? 'Loading' : 'No transactions yet',
-                  style: TextStyle(
-                    fontFamily: sansFamily,
-                    fontSize: 14,
-                    color: palette.inkMuted,
-                  ),
-                ),
-              )
-            else
-              for (final transaction in wallet.transactions) TransactionTile(transaction),
+            AnimatedSize(
+              duration: baseDuration,
+              curve: enterCurve,
+              alignment: Alignment.topCenter,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (wallet.transactions.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        wallet.loading ? 'Loading' : 'No transactions yet',
+                        style: TextStyle(
+                          fontFamily: sansFamily,
+                          fontSize: 14,
+                          color: palette.inkMuted,
+                        ),
+                      ),
+                    )
+                  else
+                    for (final transaction in wallet.transactions) TransactionTile(transaction),
+                ],
+              ),
+            ),
           ],
         ),
       ),

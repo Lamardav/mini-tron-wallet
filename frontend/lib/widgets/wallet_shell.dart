@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../design/motion.dart';
 import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/auth_provider.dart';
@@ -27,12 +28,14 @@ class WalletShell extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          Container(
+          AnimatedContainer(
+            duration: themeDuration,
+            curve: enterCurve,
             decoration: BoxDecoration(
               color: palette.surface,
               border: Border(bottom: BorderSide(color: palette.border)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
@@ -56,24 +59,36 @@ class WalletShell extends ConsumerWidget {
                     ),
                     const Spacer(),
                     for (final destination in _destinations)
-                      _NavLink(
+                      NavLink(
                         label: destination.label,
                         selected: location == destination.path,
                         onTap: () => context.go(destination.path),
                       ),
-                    const SizedBox(width: 8),
-                    IconButton(
+                    const SizedBox(width: 12),
+                    IconAction(
                       tooltip: dark ? 'Switch to light theme' : 'Switch to dark theme',
-                      onPressed: () => ref.read(themeProvider.notifier).toggle(),
-                      icon: Icon(
-                        dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                        size: 18,
-                        color: palette.inkMuted,
+                      onTap: () => ref.read(themeProvider.notifier).toggle(),
+                      icon: AnimatedSwitcher(
+                        duration: baseDuration,
+                        switchInCurve: enterCurve,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: RotationTransition(
+                            turns: Tween<double>(begin: 0.6, end: 1).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: Icon(
+                          dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                          key: ValueKey<bool>(dark),
+                          size: 18,
+                          color: palette.inkMuted,
+                        ),
                       ),
                     ),
-                    IconButton(
+                    IconAction(
                       tooltip: 'Sign out',
-                      onPressed: () => ref.read(authProvider.notifier).signOut(),
+                      onTap: () => ref.read(authProvider.notifier).signOut(),
                       icon: Icon(Icons.logout, size: 18, color: palette.inkMuted),
                     ),
                   ],
@@ -88,26 +103,116 @@ class WalletShell extends ConsumerWidget {
   }
 }
 
-class _NavLink extends StatelessWidget {
-  const _NavLink({required this.label, required this.selected, required this.onTap});
+class NavLink extends StatefulWidget {
+  const NavLink({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
   @override
+  State<NavLink> createState() => _NavLinkState();
+}
+
+class _NavLinkState extends State<NavLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final active = widget.selected || _hovered;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedDefaultTextStyle(
+                duration: fastDuration,
+                curve: enterCurve,
+                style: TextStyle(
+                  fontFamily: sansFamily,
+                  fontSize: 14,
+                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400,
+                  color: active ? palette.ink : palette.inkMuted,
+                ),
+                child: Text(widget.label),
+              ),
+              const SizedBox(height: 5),
+              AnimatedContainer(
+                duration: baseDuration,
+                curve: enterCurve,
+                height: 2,
+                width: widget.selected ? 18 : 0,
+                decoration: BoxDecoration(
+                  color: palette.brand,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class IconAction extends StatefulWidget {
+  const IconAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final Widget icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  State<IconAction> createState() => _IconActionState();
+}
+
+class _IconActionState extends State<IconAction> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return TextButton(
-      onPressed: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: sansFamily,
-          fontSize: 14,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          color: selected ? palette.ink : palette.inkMuted,
+    return Tooltip(
+      message: widget.tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: fastDuration,
+            curve: enterCurve,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _hovered ? palette.page : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: widget.icon,
+          ),
         ),
       ),
     );
