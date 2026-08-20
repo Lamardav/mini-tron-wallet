@@ -49,6 +49,7 @@ export interface IncomingTransfer {
 @Injectable()
 export class TronService {
   private readonly tronWeb: TronWeb;
+  private readonly fullHost: string;
 
   constructor(config: ConfigService) {
     const endpoint = config
@@ -56,7 +57,8 @@ export class TronService {
       .replace(/\/+$/, '');
     const apiKey = config.getOrThrow<string>('CHAINSTACK_API_KEY');
 
-    this.tronWeb = new TronWeb({ fullHost: `${endpoint}/${apiKey}` });
+    this.fullHost = `${endpoint}/${apiKey}`;
+    this.tronWeb = new TronWeb({ fullHost: this.fullHost });
   }
 
   isValidAddress(address: string): boolean {
@@ -73,6 +75,32 @@ export class TronService {
     const sun = await this.tronWeb.trx.getBalance(address);
 
     return sunToNano(BigInt(sun));
+  }
+
+  addressForPrivateKey(privateKey: string): string {
+    return TronWeb.address.fromPrivateKey(privateKey) as string;
+  }
+
+  async sendFromPrivateKey(
+    privateKey: string,
+    toAddress: string,
+    amountNano: bigint,
+  ): Promise<string> {
+    const sender = new TronWeb({
+      fullHost: this.fullHost,
+      privateKey,
+    });
+
+    const receipt = await sender.trx.sendTransaction(
+      toAddress,
+      Number(nanoToSun(amountNano)),
+    );
+
+    if (!receipt.result) {
+      throw new Error('FAUCET_TRANSFER_REJECTED');
+    }
+
+    return receipt.transaction.txID;
   }
 
   async prepareTransfer(

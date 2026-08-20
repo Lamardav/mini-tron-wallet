@@ -64,6 +64,39 @@ class WalletTransaction {
   BigInt get debitedNano => incoming ? BigInt.zero : amountNano + (feeNano ?? BigInt.zero);
 }
 
+class FaucetStatus {
+  const FaucetStatus({
+    required this.enabled,
+    this.address,
+    this.balanceNano,
+    this.maxClaimNano,
+  });
+
+  factory FaucetStatus.fromJson(Map<String, dynamic> json) {
+    if (json['enabled'] != true) {
+      return const FaucetStatus(enabled: false);
+    }
+
+    return FaucetStatus(
+      enabled: true,
+      address: json['address'] as String,
+      balanceNano: BigInt.parse(json['balanceNano'] as String),
+      maxClaimNano: BigInt.parse(json['maxClaimNano'] as String),
+    );
+  }
+
+  final bool enabled;
+  final String? address;
+  final BigInt? balanceNano;
+  final BigInt? maxClaimNano;
+}
+
+final faucetProvider = FutureProvider.autoDispose<FaucetStatus>((ref) async {
+  final payload = await ref.read(apiClientProvider).get('/faucet');
+
+  return FaucetStatus.fromJson(payload as Map<String, dynamic>);
+});
+
 class FeeEstimate {
   const FeeEstimate({
     required this.feeNano,
@@ -241,6 +274,12 @@ class WalletNotifier extends Notifier<WalletState> {
 
   Future<String> statementCsv() {
     return ref.read(apiClientProvider).getText('/wallet/transactions/export');
+  }
+
+  Future<void> claimFromFaucet(BigInt amountNano) async {
+    await ref.read(apiClientProvider).post('/faucet/claim', {
+      'amountNano': amountNano.toString(),
+    });
   }
 
   Future<FeeEstimate> estimate({

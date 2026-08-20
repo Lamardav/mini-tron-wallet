@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserThrottlerGuard } from './common/user-throttler.guard';
 import { validateEnv } from './config/env.validation';
 import { CryptoModule } from './crypto/crypto.module';
+import { FaucetModule } from './faucet/faucet.module';
 import { HealthController } from './health.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -25,6 +26,7 @@ import { WorkersModule } from './workers/workers.module';
     KafkaModule,
     AuthModule,
     WalletModule,
+    FaucetModule,
     WorkersModule,
   ],
   controllers: [HealthController],

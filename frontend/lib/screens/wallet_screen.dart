@@ -8,6 +8,7 @@ import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
 import '../widgets/amount_text.dart';
+import '../widgets/faucet_card.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/transaction_tile.dart';
 
@@ -102,9 +103,14 @@ class WalletScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            FadeIn(
+              delay: const Duration(milliseconds: 60),
+              child: const FaucetCard(),
+            ),
             const SizedBox(height: 32),
             FadeIn(
-              delay: const Duration(milliseconds: 80),
+              delay: const Duration(milliseconds: 120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
