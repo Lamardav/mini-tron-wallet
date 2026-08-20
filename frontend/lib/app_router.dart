@@ -5,31 +5,34 @@ import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/send_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/transactions_screen.dart';
 import 'screens/wallet_screen.dart';
 import 'widgets/wallet_shell.dart';
 
+const _splashRoute = '/';
 const _publicRoutes = {'/login', '/register'};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/wallet',
+    initialLocation: _splashRoute,
     redirect: (context, state) {
-      if (!auth.restored) {
-        return null;
-      }
+      final location = state.matchedLocation;
 
-      final onPublicRoute = _publicRoutes.contains(state.matchedLocation);
+      if (!auth.restored) {
+        return location == _splashRoute ? null : _splashRoute;
+      }
 
       if (!auth.signedIn) {
-        return onPublicRoute ? null : '/login';
+        return _publicRoutes.contains(location) ? null : '/login';
       }
 
-      return onPublicRoute ? '/wallet' : null;
+      return _publicRoutes.contains(location) || location == _splashRoute ? '/wallet' : null;
     },
     routes: [
+      GoRoute(path: _splashRoute, builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       ShellRoute(

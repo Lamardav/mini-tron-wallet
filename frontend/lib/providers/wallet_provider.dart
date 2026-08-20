@@ -89,6 +89,10 @@ class WalletNotifier extends Notifier<WalletState> {
       final overview = await api.get('/wallet') as Map<String, dynamic>;
       final history = await api.get('/wallet/transactions') as List<dynamic>;
 
+      if (!ref.mounted) {
+        return;
+      }
+
       state = WalletState(
         address: overview['address'] as String,
         balanceNano: BigInt.parse(overview['balanceNano'] as String),
@@ -98,7 +102,9 @@ class WalletNotifier extends Notifier<WalletState> {
         loading: false,
       );
     } on ApiException catch (error) {
-      state = state.copyWith(loading: false, error: humanizeError(error.message));
+      if (ref.mounted) {
+        state = state.copyWith(loading: false, error: humanizeError(error.message));
+      }
     }
   }
 

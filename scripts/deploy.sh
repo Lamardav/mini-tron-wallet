@@ -13,7 +13,7 @@ echo "uploading tracked sources"
 git archive HEAD | ssh "$HOST" "mkdir -p $DIR && tar -x -C $DIR"
 
 echo "uploading the web bundle"
-ssh "$HOST" "rm -rf $DIR/frontend/build/web && mkdir -p $DIR/frontend/build"
+ssh "$HOST" "mkdir -p $DIR/frontend/build/web && find $DIR/frontend/build/web -mindepth 1 -delete"
 tar czf - -C frontend/build web | ssh "$HOST" "tar xzf - -C $DIR/frontend/build"
 
 echo "uploading environment"
