@@ -1,0 +1,9 @@
+{
+  "name": "scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ssh2": "^1.16.0",
+    "tronweb": "^6.0.3"
+  }
+}
