@@ -10,7 +10,7 @@ function makeService(masterKey = 'a'.repeat(64)): CryptoService {
 describe('CryptoService', () => {
   it('decrypts what it encrypted', () => {
     const service = makeService();
-    const privateKey = '0000000000000000000000000000000000000000000000000000000000000001';
+    const privateKey = '0'.repeat(63) + '1';
 
     expect(service.decrypt(service.encrypt(privateKey))).toBe(privateKey);
   });
