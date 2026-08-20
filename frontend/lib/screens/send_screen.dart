@@ -13,6 +13,7 @@ import '../design/palette.dart';
 import '../design/theme.dart';
 import '../providers/wallet_provider.dart';
 import '../widgets/amount_text.dart';
+import '../widgets/send_confirmation.dart';
 
 const _addressLength = 34;
 const _estimateDebounce = Duration(milliseconds: 450);
@@ -98,6 +99,47 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     }
   }
 
+  Future<void> _fillMax() async {
+    final toAddress = _address.text.trim();
+    final balance = ref.read(walletProvider).balanceNano;
+
+    if (toAddress.length != _addressLength || balance == null || balance == BigInt.zero) {
+      return;
+    }
+
+    setState(() => _estimating = true);
+
+    try {
+      final fee = await ref
+          .read(walletProvider.notifier)
+          .estimate(toAddress: toAddress, amountNano: balance);
+      final sendable = balance - fee.feeNano;
+
+      if (!mounted) {
+        return;
+      }
+
+      if (sendable <= BigInt.zero) {
+        setState(() {
+          _estimating = false;
+          _error = 'The balance does not even cover the network fee';
+        });
+
+        return;
+      }
+
+      _amount.text = formatSendable(sendable);
+      setState(() => _estimating = false);
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(() {
+          _estimating = false;
+          _error = humanizeError(error.message);
+        });
+      }
+    }
+  }
+
   Future<void> _submit() async {
     final toAddress = _address.text.trim();
     final amountNano = trxToNano(_amount.text);
@@ -113,6 +155,25 @@ class _SendScreenState extends ConsumerState<SendScreen> {
         () => _error = 'Enter an amount with at most six decimal places, for example 0.123456',
       );
 
+      return;
+    }
+
+    final fee = _fee;
+
+    if (fee == null) {
+      setState(() => _error = _feeProblem ?? 'Waiting for the network fee estimate');
+
+      return;
+    }
+
+    final approved = await confirmTransfer(
+      context,
+      toAddress: toAddress,
+      amountNano: amountNano,
+      fee: fee,
+    );
+
+    if (!approved || !mounted) {
       return;
     }
 
@@ -142,9 +203,20 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     } on ApiException catch (error) {
       setState(() {
         _sending = false;
-        _error = humanizeError(error.message);
+        _error = _describeFailure(error);
       });
     }
+  }
+
+  String _describeFailure(ApiException error) {
+    final shortfall = error.nano('shortfallNano');
+    final message = humanizeError(error.message);
+
+    if (shortfall == null) {
+      return message;
+    }
+
+    return '$message. Together with the network fee you are ${nanoToTrx(shortfall)} TRX short';
   }
 
   @override
@@ -202,9 +274,15 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onSubmitted: (_) => _submit(),
                     style: TextStyle(fontFamily: monoFamily, fontSize: 14, color: palette.ink),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Amount, TRX',
                       hintText: '0.123456',
+                      suffixIcon: TextButton(
+                        onPressed: _address.text.trim().length == _addressLength && !_estimating
+                            ? _fillMax
+                            : null,
+                        child: const Text('MAX'),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

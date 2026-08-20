@@ -8,17 +8,23 @@ import { Prisma } from '@prisma/client';
 import { AmountError, nanoToTrx, parseAmountNano } from '../common/amount';
 import { CryptoService } from '../crypto/crypto.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TronService } from '../tron/tron.service';
+import { FeeEstimate, TronService } from '../tron/tron.service';
 import { SendDto } from './dto';
 import { toTransactionResponse, TransactionRecord, TransactionResponse } from './transaction.mapper';
 import { WalletEventsService } from './wallet-events.service';
 
-const HISTORY_LIMIT = 100;
+const PAGE_SIZE = 20;
+const EXPORT_LIMIT = 10_000;
 const UPDATE_HOLD_MS = 25_000;
 
 interface WalletKeys {
   address: string;
   encryptedPrivateKey: string;
+}
+
+export interface HistoryPage {
+  items: TransactionResponse[];
+  nextCursor: string | null;
 }
 
 @Injectable()
@@ -32,21 +38,6 @@ export class WalletService {
     private readonly events: WalletEventsService,
   ) {}
 
-  async waitForUpdate(userId: string, since: number) {
-    const version = await this.events.waitForChange(userId, since, UPDATE_HOLD_MS);
-
-    if (version === null) {
-      return { version: this.events.versionFor(userId), changed: false };
-    }
-
-    const [wallet, transactions] = await Promise.all([
-      this.overview(userId),
-      this.history(userId),
-    ]);
-
-    return { version, changed: true, wallet, transactions };
-  }
-
   async overview(userId: string) {
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
     const balanceNano = await this.tron.getBalanceNano(wallet.address);
@@ -58,49 +49,97 @@ export class WalletService {
     };
   }
 
-  async estimate(userId: string, dto: SendDto) {
-    if (!this.tron.isValidAddress(dto.toAddress)) {
-      throw new BadRequestException('INVALID_ADDRESS');
-    }
+  async history(userId: string, cursor?: string, limit = PAGE_SIZE): Promise<HistoryPage> {
+    const rows = (await this.prisma.transaction.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    })) as TransactionRecord[];
 
-    const amountNano = this.parseAmount(dto.amountNano);
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
-
-    this.rejectSelfTransfer(wallet.address, dto.toAddress);
-
-    const fee = await this.tron.estimateFee(wallet.address, dto.toAddress, amountNano);
-    const totalNano = amountNano + fee.totalNano;
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
 
     return {
-      amountNano: amountNano.toString(),
-      feeNano: fee.totalNano.toString(),
-      feeTrx: nanoToTrx(fee.totalNano),
-      activationNano: fee.activationNano.toString(),
-      bandwidthNano: fee.bandwidthNano.toString(),
-      totalNano: totalNano.toString(),
-      totalTrx: nanoToTrx(totalNano),
-      coveredByBandwidth: fee.coveredByBandwidth,
-      recipientActivated: fee.recipientActivated,
+      items: items.map(toTransactionResponse),
+      nextCursor: hasMore ? items[items.length - 1].id : null,
     };
   }
 
-  async history(userId: string): Promise<TransactionResponse[]> {
-    const transactions = await this.prisma.transaction.findMany({
+  async exportCsv(userId: string): Promise<string> {
+    const rows = (await this.prisma.transaction.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: HISTORY_LIMIT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: EXPORT_LIMIT,
+    })) as TransactionRecord[];
+
+    const header = [
+      'created_at',
+      'direction',
+      'status',
+      'amount_trx',
+      'amount_nano',
+      'fee_trx',
+      'fee_nano',
+      'total_debited_trx',
+      'total_debited_nano',
+      'counterparty_address',
+      'tx_hash',
+      'block_number',
+    ];
+
+    const lines = rows.map((row) => {
+      const fee = row.direction === 'outgoing' ? (row.feeNano ?? 0n) : 0n;
+      const debited = row.direction === 'outgoing' ? row.amountNano + fee : 0n;
+
+      return [
+        row.createdAt.toISOString(),
+        row.direction,
+        row.status,
+        nanoToTrx(row.amountNano),
+        row.amountNano.toString(),
+        row.feeNano === null ? '' : nanoToTrx(row.feeNano),
+        row.feeNano === null ? '' : row.feeNano.toString(),
+        debited === 0n ? '' : nanoToTrx(debited),
+        debited === 0n ? '' : debited.toString(),
+        row.address,
+        row.txHash ?? '',
+        row.blockNumber?.toString() ?? '',
+      ].join(',');
     });
 
-    return (transactions as TransactionRecord[]).map(toTransactionResponse);
+    return [header.join(','), ...lines].join('\n');
+  }
+
+  async waitForUpdate(userId: string, since: number) {
+    const version = await this.events.waitForChange(userId, since, UPDATE_HOLD_MS);
+
+    if (version === null) {
+      return { version: this.events.versionFor(userId), changed: false };
+    }
+
+    const [wallet, page] = await Promise.all([this.overview(userId), this.history(userId)]);
+
+    return {
+      version,
+      changed: true,
+      wallet,
+      transactions: page.items,
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  async estimate(userId: string, dto: SendDto) {
+    const amountNano = this.parseAmount(dto.amountNano);
+    const wallet = await this.requireWallet(userId, dto.toAddress);
+    const prepared = await this.tron.prepareTransfer(wallet.address, dto.toAddress, amountNano);
+
+    return this.describeCost(amountNano, prepared.fee);
   }
 
   async send(userId: string, dto: SendDto, idempotencyKey: string): Promise<TransactionResponse> {
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException('IDEMPOTENCY_KEY_REQUIRED');
-    }
-
-    if (!this.tron.isValidAddress(dto.toAddress)) {
-      throw new BadRequestException('INVALID_ADDRESS');
     }
 
     const amountNano = this.parseAmount(dto.amountNano);
@@ -113,14 +152,19 @@ export class WalletService {
       return toTransactionResponse(alreadySent as TransactionRecord);
     }
 
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
-
-    this.rejectSelfTransfer(wallet.address, dto.toAddress);
-
+    const wallet = await this.requireWallet(userId, dto.toAddress);
+    const prepared = await this.tron.prepareTransfer(wallet.address, dto.toAddress, amountNano);
     const balanceNano = await this.tron.getBalanceNano(wallet.address);
+    const requiredNano = amountNano + prepared.fee.totalNano;
 
-    if (balanceNano < amountNano) {
-      throw new UnprocessableEntityException('INSUFFICIENT_BALANCE');
+    if (balanceNano < requiredNano) {
+      throw new UnprocessableEntityException({
+        message: 'INSUFFICIENT_BALANCE',
+        requiredNano: requiredNano.toString(),
+        feeNano: prepared.fee.totalNano.toString(),
+        balanceNano: balanceNano.toString(),
+        shortfallNano: (requiredNano - balanceNano).toString(),
+      });
     }
 
     const transaction = await this.claimTransaction(
@@ -139,16 +183,41 @@ export class WalletService {
       return toTransactionResponse(owned as TransactionRecord);
     }
 
-    const sent = await this.signAndBroadcast(transaction, wallet, dto, amountNano);
+    const sent = await this.signAndBroadcast(transaction, wallet, prepared.transaction);
     this.events.bump(userId);
 
     return toTransactionResponse(sent);
   }
 
-  private rejectSelfTransfer(ownAddress: string, toAddress: string) {
-    if (ownAddress === toAddress) {
+  private describeCost(amountNano: bigint, fee: FeeEstimate) {
+    const totalNano = amountNano + fee.totalNano;
+
+    return {
+      amountNano: amountNano.toString(),
+      amountTrx: nanoToTrx(amountNano),
+      feeNano: fee.totalNano.toString(),
+      feeTrx: nanoToTrx(fee.totalNano),
+      activationNano: fee.activationNano.toString(),
+      bandwidthNano: fee.bandwidthNano.toString(),
+      totalNano: totalNano.toString(),
+      totalTrx: nanoToTrx(totalNano),
+      coveredByBandwidth: fee.coveredByBandwidth,
+      recipientActivated: fee.recipientActivated,
+    };
+  }
+
+  private async requireWallet(userId: string, toAddress: string): Promise<WalletKeys> {
+    if (!this.tron.isValidAddress(toAddress)) {
+      throw new BadRequestException('INVALID_ADDRESS');
+    }
+
+    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+
+    if (wallet.address === toAddress) {
       throw new BadRequestException('CANNOT_SEND_TO_SELF');
     }
+
+    return wallet;
   }
 
   private parseAmount(raw: string): bigint {
@@ -194,16 +263,13 @@ export class WalletService {
   private async signAndBroadcast(
     transaction: TransactionRecord,
     wallet: WalletKeys,
-    dto: SendDto,
-    amountNano: bigint,
+    prepared: object,
   ): Promise<TransactionRecord> {
     let signed;
 
     try {
-      signed = await this.tron.buildSignedTransfer(
-        wallet.address,
-        dto.toAddress,
-        amountNano,
+      signed = await this.tron.signTransfer(
+        prepared,
         this.crypto.decrypt(wallet.encryptedPrivateKey),
       );
     } catch (error) {

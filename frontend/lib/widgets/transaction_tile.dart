@@ -48,9 +48,29 @@ class _TransactionTileState extends State<TransactionTile> {
                   children: [
                     AmountText(
                       amountNano: transaction.amountNano,
-                      prefix: transaction.incoming ? '+ ' : '− ',
+                      prefix: transaction.incoming ? '+ ' : '- ',
                       fontSize: 15,
                     ),
+                    if (transaction.chargedFee) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            'fee ',
+                            style: TextStyle(
+                              fontFamily: sansFamily,
+                              fontSize: 11,
+                              color: palette.inkMuted,
+                            ),
+                          ),
+                          AmountText(
+                            amountNano: transaction.feeNano!,
+                            fontSize: 11,
+                            color: palette.inkMuted,
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       transaction.address,

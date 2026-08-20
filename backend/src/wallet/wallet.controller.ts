@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   HttpCode,
   Post,
@@ -9,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser, JwtAuthGuard } from '../auth/jwt.guard';
 import { SendDto } from './dto';
 import { WalletService } from './wallet.service';
@@ -28,8 +30,15 @@ export class WalletController {
   }
 
   @Get('transactions')
-  history(@Req() request: AuthenticatedRequest) {
-    return this.wallet.history(request.user.id);
+  history(@Req() request: AuthenticatedRequest, @Query('cursor') cursor?: string) {
+    return this.wallet.history(request.user.id, cursor);
+  }
+
+  @Get('transactions/export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="tron-wallet-statement.csv"')
+  export(@Req() request: AuthenticatedRequest) {
+    return this.wallet.exportCsv(request.user.id);
   }
 
   @Get('updates')
@@ -43,6 +52,7 @@ export class WalletController {
     return this.wallet.estimate(request.user.id, dto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('send')
   send(
     @Req() request: AuthenticatedRequest,

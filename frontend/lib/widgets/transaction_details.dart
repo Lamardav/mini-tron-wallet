@@ -82,7 +82,7 @@ class TransactionDetails extends StatelessWidget {
               const SizedBox(height: 14),
               AmountText(
                 amountNano: transaction.amountNano,
-                prefix: transaction.incoming ? '+ ' : '− ',
+                prefix: transaction.incoming ? '+ ' : '- ',
                 fontSize: 26,
               ),
               const SizedBox(height: 22),
@@ -96,6 +96,21 @@ class TransactionDetails extends StatelessWidget {
                     ? _Muted(transaction.settled ? 'not reported' : 'known once confirmed')
                     : AmountText(amountNano: transaction.feeNano!, fontSize: 13),
               ),
+              if (!transaction.incoming)
+                _Row(
+                  label: 'Total debited from your wallet',
+                  child: transaction.feeNano == null
+                      ? _Muted(
+                          transaction.settled
+                              ? 'the amount above, fee not reported'
+                              : 'known once confirmed',
+                        )
+                      : AmountText(
+                          amountNano: transaction.debitedNano,
+                          fontSize: 15,
+                          color: palette.ink,
+                        ),
+                ),
               _Row(
                 label: 'Balance before',
                 child: transaction.balanceBeforeNano == null

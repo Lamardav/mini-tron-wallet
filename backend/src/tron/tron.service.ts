@@ -25,6 +25,11 @@ export interface FeeEstimate {
   recipientActivated: boolean;
 }
 
+export interface PreparedTransfer {
+  transaction: object;
+  fee: FeeEstimate;
+}
+
 export interface SignedTransfer {
   txHash: string;
   signed: object;
@@ -64,23 +69,7 @@ export class TronService {
     return sunToNano(BigInt(sun));
   }
 
-  async buildSignedTransfer(
-    from: string,
-    to: string,
-    amountNano: bigint,
-    privateKey: string,
-  ): Promise<SignedTransfer> {
-    const transaction = await this.tronWeb.transactionBuilder.sendTrx(
-      to,
-      Number(nanoToSun(amountNano)),
-      from,
-    );
-    const signed = await this.tronWeb.trx.sign(transaction, privateKey);
-
-    return { txHash: signed.txID, signed };
-  }
-
-  async estimateFee(from: string, to: string, amountNano: bigint): Promise<FeeEstimate> {
+  async prepareTransfer(from: string, to: string, amountNano: bigint): Promise<PreparedTransfer> {
     const [transaction, resources, parameters, recipient] = await Promise.all([
       this.tronWeb.transactionBuilder.sendTrx(to, Number(nanoToSun(amountNano)), from),
       this.tronWeb.trx.getAccountResources(from),
@@ -91,6 +80,7 @@ export class TronService {
     const rawDataHex = (transaction as { raw_data_hex?: string }).raw_data_hex ?? '';
     const free = (resources.freeNetLimit ?? 0) - (resources.freeNetUsed ?? 0);
     const staked = (resources.NetLimit ?? 0) - (resources.NetUsed ?? 0);
+    const recipientActivated = Object.keys(recipient ?? {}).length > 0;
 
     const fee = calculateFee({
       transactionBytes: rawDataHex.length / 2 + SIGNATURE_OVERHEAD_BYTES,
@@ -105,16 +95,27 @@ export class TronService {
         'getCreateNewAccountFeeInSystemContract',
         DEFAULT_ACTIVATION_SUN,
       ),
-      recipientActivated: Object.keys(recipient ?? {}).length > 0,
+      recipientActivated,
     });
 
     return {
-      bandwidthNano: sunToNano(fee.bandwidthSun),
-      activationNano: sunToNano(fee.activationSun),
-      totalNano: sunToNano(fee.totalSun),
-      coveredByBandwidth: fee.coveredByBandwidth,
-      recipientActivated: Object.keys(recipient ?? {}).length > 0,
+      transaction,
+      fee: {
+        bandwidthNano: sunToNano(fee.bandwidthSun),
+        activationNano: sunToNano(fee.activationSun),
+        totalNano: sunToNano(fee.totalSun),
+        coveredByBandwidth: fee.coveredByBandwidth,
+        recipientActivated,
+      },
     };
+  }
+
+  async signTransfer(transaction: object, privateKey: string): Promise<SignedTransfer> {
+    const signed = (await this.tronWeb.trx.sign(transaction as never, privateKey)) as {
+      txID: string;
+    };
+
+    return { txHash: signed.txID, signed };
   }
 
   private readParameter(

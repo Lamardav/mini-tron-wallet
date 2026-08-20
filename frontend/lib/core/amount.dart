@@ -9,6 +9,12 @@ String nanoToTrx(BigInt nano) {
   return '$whole.$fraction';
 }
 
+String formatSendable(BigInt nano) {
+  final full = nanoToTrx(nano);
+
+  return full.substring(0, full.length - 3);
+}
+
 BigInt? trxToNano(String input) {
   final match = _trxPattern.firstMatch(input.trim());
 

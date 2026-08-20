@@ -58,6 +58,10 @@ class WalletTransaction {
   bool get incoming => direction == 'incoming';
 
   bool get settled => status == 'confirmed';
+
+  bool get chargedFee => !incoming && feeNano != null && feeNano! > BigInt.zero;
+
+  BigInt get debitedNano => incoming ? BigInt.zero : amountNano + (feeNano ?? BigInt.zero);
 }
 
 class FeeEstimate {
@@ -93,28 +97,38 @@ class WalletState {
     this.address,
     this.balanceNano,
     this.transactions = const [],
+    this.nextCursor,
     this.loading = true,
+    this.loadingMore = false,
     this.error,
   });
 
   final String? address;
   final BigInt? balanceNano;
   final List<WalletTransaction> transactions;
+  final String? nextCursor;
   final bool loading;
+  final bool loadingMore;
   final String? error;
+
+  bool get hasMore => nextCursor != null;
 
   WalletState copyWith({
     String? address,
     BigInt? balanceNano,
     List<WalletTransaction>? transactions,
+    String? nextCursor,
     bool? loading,
+    bool? loadingMore,
     String? error,
   }) {
     return WalletState(
       address: address ?? this.address,
       balanceNano: balanceNano ?? this.balanceNano,
       transactions: transactions ?? this.transactions,
+      nextCursor: nextCursor ?? this.nextCursor,
       loading: loading ?? this.loading,
+      loadingMore: loadingMore ?? this.loadingMore,
       error: error,
     );
   }
@@ -184,8 +198,49 @@ class WalletNotifier extends Notifier<WalletState> {
       transactions: history
           .map((item) => WalletTransaction.fromJson(item as Map<String, dynamic>))
           .toList(),
+      nextCursor: update['nextCursor'] as String?,
       loading: false,
     );
+  }
+
+  Future<void> loadMore() async {
+    final cursor = state.nextCursor;
+
+    if (cursor == null || state.loadingMore) {
+      return;
+    }
+
+    state = state.copyWith(loadingMore: true);
+
+    try {
+      final payload = await ref
+          .read(apiClientProvider)
+          .get('/wallet/transactions?cursor=$cursor') as Map<String, dynamic>;
+
+      if (!ref.mounted) {
+        return;
+      }
+
+      final older = (payload['items'] as List<dynamic>)
+          .map((item) => WalletTransaction.fromJson(item as Map<String, dynamic>))
+          .toList();
+
+      state = WalletState(
+        address: state.address,
+        balanceNano: state.balanceNano,
+        transactions: [...state.transactions, ...older],
+        nextCursor: payload['nextCursor'] as String?,
+        loading: false,
+      );
+    } on ApiException catch (error) {
+      if (ref.mounted) {
+        state = state.copyWith(loadingMore: false, error: humanizeError(error.message));
+      }
+    }
+  }
+
+  Future<String> statementCsv() {
+    return ref.read(apiClientProvider).getText('/wallet/transactions/export');
   }
 
   Future<FeeEstimate> estimate({

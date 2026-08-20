@@ -10,6 +10,19 @@ void main() {
     });
   });
 
+  group('formatSendable', () {
+    test('drops the three digits the network cannot settle', () {
+      expect(formatSendable(BigInt.parse('2500000000')), '2.500000');
+      expect(formatSendable(BigInt.parse('123456000')), '0.123456');
+    });
+
+    test('produces a value trxToNano accepts back', () {
+      final nano = BigInt.parse('7999800000');
+
+      expect(trxToNano(formatSendable(nano)), nano);
+    });
+  });
+
   group('trxToNano', () {
     test('converts whole and fractional amounts', () {
       expect(trxToNano('2'), BigInt.parse('2000000000'));

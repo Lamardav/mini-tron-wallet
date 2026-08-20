@@ -59,5 +59,5 @@ export async function registerUser(prefix: string): Promise<TestUser> {
 export async function transactionStatus(user: TestUser, id: string): Promise<string | undefined> {
   const history = await api('GET', '/wallet/transactions', { token: user.token });
 
-  return history.data.find((transaction: { id: string }) => transaction.id === id)?.status;
+  return history.data.items.find((transaction: { id: string }) => transaction.id === id)?.status;
 }
