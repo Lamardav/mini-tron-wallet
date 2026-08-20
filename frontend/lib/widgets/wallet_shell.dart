@@ -96,8 +96,81 @@ class WalletShell extends ConsumerWidget {
               ),
             ),
           ),
+          if (ref.watch(authProvider).user?.emailVerified == false)
+            const VerificationBanner(),
           Expanded(child: child),
         ],
+      ),
+    );
+  }
+}
+
+class VerificationBanner extends ConsumerStatefulWidget {
+  const VerificationBanner({super.key});
+
+  @override
+  ConsumerState<VerificationBanner> createState() => _VerificationBannerState();
+}
+
+class _VerificationBannerState extends ConsumerState<VerificationBanner> {
+  bool _sending = false;
+
+  Future<void> _resend() async {
+    setState(() => _sending = true);
+
+    try {
+      await ref.read(authProvider.notifier).resendVerification();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Verification email requested')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      width: double.infinity,
+      color: palette.pending.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Row(
+            children: [
+              Icon(Icons.mark_email_unread_outlined, size: 16, color: palette.pending),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Your email is not confirmed yet. Confirm it to keep access to recovery and alerts.',
+                  style: TextStyle(
+                    fontFamily: sansFamily,
+                    fontSize: 13,
+                    color: palette.pending,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _sending ? null : _resend,
+                child: Text(_sending ? 'Sending' : 'Resend'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

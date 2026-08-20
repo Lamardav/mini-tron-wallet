@@ -47,7 +47,9 @@ describe('nanoToSun and sunToNano', () => {
   });
 
   it('rejects amounts the network cannot represent', () => {
-    expect(() => nanoToSun(123_456_789n)).toThrow('AMOUNT_NOT_REPRESENTABLE_ON_CHAIN');
+    expect(() => nanoToSun(123_456_789n)).toThrow(
+      'AMOUNT_NOT_REPRESENTABLE_ON_CHAIN',
+    );
   });
 });
 
@@ -67,6 +69,8 @@ describe('parseAmountNano', () => {
   });
 
   it('rejects amounts finer than one SUN', () => {
-    expect(() => parseAmountNano('123456789')).toThrow('AMOUNT_NOT_REPRESENTABLE_ON_CHAIN');
+    expect(() => parseAmountNano('123456789')).toThrow(
+      'AMOUNT_NOT_REPRESENTABLE_ON_CHAIN',
+    );
   });
 });

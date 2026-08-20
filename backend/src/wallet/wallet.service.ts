@@ -8,9 +8,13 @@ import { Prisma } from '@prisma/client';
 import { AmountError, nanoToTrx, parseAmountNano } from '../common/amount';
 import { CryptoService } from '../crypto/crypto.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { FeeEstimate, TronService } from '../tron/tron.service';
+import { FeeEstimate, SignedTransfer, TronService } from '../tron/tron.service';
 import { SendDto } from './dto';
-import { toTransactionResponse, TransactionRecord, TransactionResponse } from './transaction.mapper';
+import {
+  toTransactionResponse,
+  TransactionRecord,
+  TransactionResponse,
+} from './transaction.mapper';
 import { WalletEventsService } from './wallet-events.service';
 
 const PAGE_SIZE = 20;
@@ -39,7 +43,9 @@ export class WalletService {
   ) {}
 
   async overview(userId: string) {
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+    const wallet = await this.prisma.wallet.findUniqueOrThrow({
+      where: { userId },
+    });
     const balanceNano = await this.tron.getBalanceNano(wallet.address);
 
     return {
@@ -49,7 +55,11 @@ export class WalletService {
     };
   }
 
-  async history(userId: string, cursor?: string, limit = PAGE_SIZE): Promise<HistoryPage> {
+  async history(
+    userId: string,
+    cursor?: string,
+    limit = PAGE_SIZE,
+  ): Promise<HistoryPage> {
     const rows = (await this.prisma.transaction.findMany({
       where: { userId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -112,13 +122,20 @@ export class WalletService {
   }
 
   async waitForUpdate(userId: string, since: number) {
-    const version = await this.events.waitForChange(userId, since, UPDATE_HOLD_MS);
+    const version = await this.events.waitForChange(
+      userId,
+      since,
+      UPDATE_HOLD_MS,
+    );
 
     if (version === null) {
       return { version: this.events.versionFor(userId), changed: false };
     }
 
-    const [wallet, page] = await Promise.all([this.overview(userId), this.history(userId)]);
+    const [wallet, page] = await Promise.all([
+      this.overview(userId),
+      this.history(userId),
+    ]);
 
     return {
       version,
@@ -132,12 +149,20 @@ export class WalletService {
   async estimate(userId: string, dto: SendDto) {
     const amountNano = this.parseAmount(dto.amountNano);
     const wallet = await this.requireWallet(userId, dto.toAddress);
-    const prepared = await this.tron.prepareTransfer(wallet.address, dto.toAddress, amountNano);
+    const prepared = await this.tron.prepareTransfer(
+      wallet.address,
+      dto.toAddress,
+      amountNano,
+    );
 
     return this.describeCost(amountNano, prepared.fee);
   }
 
-  async send(userId: string, dto: SendDto, idempotencyKey: string): Promise<TransactionResponse> {
+  async send(
+    userId: string,
+    dto: SendDto,
+    idempotencyKey: string,
+  ): Promise<TransactionResponse> {
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException('IDEMPOTENCY_KEY_REQUIRED');
     }
@@ -149,11 +174,15 @@ export class WalletService {
     });
 
     if (alreadySent) {
-      return toTransactionResponse(alreadySent as TransactionRecord);
+      return toTransactionResponse(alreadySent);
     }
 
     const wallet = await this.requireWallet(userId, dto.toAddress);
-    const prepared = await this.tron.prepareTransfer(wallet.address, dto.toAddress, amountNano);
+    const prepared = await this.tron.prepareTransfer(
+      wallet.address,
+      dto.toAddress,
+      amountNano,
+    );
     const balanceNano = await this.tron.getBalanceNano(wallet.address);
     const requiredNano = amountNano + prepared.fee.totalNano;
 
@@ -180,10 +209,14 @@ export class WalletService {
         where: { userId_idempotencyKey: { userId, idempotencyKey } },
       });
 
-      return toTransactionResponse(owned as TransactionRecord);
+      return toTransactionResponse(owned);
     }
 
-    const sent = await this.signAndBroadcast(transaction, wallet, prepared.transaction);
+    const sent = await this.signAndBroadcast(
+      transaction,
+      wallet,
+      prepared.transaction,
+    );
     this.events.bump(userId);
 
     return toTransactionResponse(sent);
@@ -206,12 +239,17 @@ export class WalletService {
     };
   }
 
-  private async requireWallet(userId: string, toAddress: string): Promise<WalletKeys> {
+  private async requireWallet(
+    userId: string,
+    toAddress: string,
+  ): Promise<WalletKeys> {
     if (!this.tron.isValidAddress(toAddress)) {
       throw new BadRequestException('INVALID_ADDRESS');
     }
 
-    const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
+    const wallet = await this.prisma.wallet.findUniqueOrThrow({
+      where: { userId },
+    });
 
     if (wallet.address === toAddress) {
       throw new BadRequestException('CANNOT_SEND_TO_SELF');
@@ -240,7 +278,7 @@ export class WalletService {
     balanceBeforeNano: bigint,
   ): Promise<TransactionRecord | null> {
     try {
-      return (await this.prisma.transaction.create({
+      return await this.prisma.transaction.create({
         data: {
           userId,
           direction: 'outgoing',
@@ -250,9 +288,12 @@ export class WalletService {
           idempotencyKey,
           balanceBeforeNano,
         },
-      })) as TransactionRecord;
+      });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         return null;
       }
 
@@ -265,7 +306,7 @@ export class WalletService {
     wallet: WalletKeys,
     prepared: object,
   ): Promise<TransactionRecord> {
-    let signed;
+    let signed: SignedTransfer;
 
     try {
       signed = await this.tron.signTransfer(
@@ -273,12 +314,14 @@ export class WalletService {
         this.crypto.decrypt(wallet.encryptedPrivateKey),
       );
     } catch (error) {
-      this.logger.error(`Signing failed for ${transaction.id}: ${(error as Error).message}`);
+      this.logger.error(
+        `Signing failed for ${transaction.id}: ${(error as Error).message}`,
+      );
 
-      return (await this.prisma.transaction.update({
+      return await this.prisma.transaction.update({
         where: { id: transaction.id },
         data: { status: 'failed' },
-      })) as TransactionRecord;
+      });
     }
 
     const withHash = (await this.prisma.transaction.update({

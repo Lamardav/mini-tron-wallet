@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { TronWeb } from 'tronweb';
 import { nanoToSun, sunToNano } from '../common/amount';
 import { calculateFee } from './fee';
-import { ConfirmationStatus, parseBlockTransfers, resolveConfirmationStatus } from './tron.parse';
+import {
+  ConfirmationStatus,
+  parseBlockTransfers,
+  resolveConfirmationStatus,
+} from './tron.parse';
 
 export type { ConfirmationStatus };
 
@@ -47,7 +51,9 @@ export class TronService {
   private readonly tronWeb: TronWeb;
 
   constructor(config: ConfigService) {
-    const endpoint = config.getOrThrow<string>('CHAINSTACK_ENDPOINT').replace(/\/+$/, '');
+    const endpoint = config
+      .getOrThrow<string>('CHAINSTACK_ENDPOINT')
+      .replace(/\/+$/, '');
     const apiKey = config.getOrThrow<string>('CHAINSTACK_API_KEY');
 
     this.tronWeb = new TronWeb({ fullHost: `${endpoint}/${apiKey}` });
@@ -69,15 +75,24 @@ export class TronService {
     return sunToNano(BigInt(sun));
   }
 
-  async prepareTransfer(from: string, to: string, amountNano: bigint): Promise<PreparedTransfer> {
+  async prepareTransfer(
+    from: string,
+    to: string,
+    amountNano: bigint,
+  ): Promise<PreparedTransfer> {
     const [transaction, resources, parameters, recipient] = await Promise.all([
-      this.tronWeb.transactionBuilder.sendTrx(to, Number(nanoToSun(amountNano)), from),
+      this.tronWeb.transactionBuilder.sendTrx(
+        to,
+        Number(nanoToSun(amountNano)),
+        from,
+      ),
       this.tronWeb.trx.getAccountResources(from),
       this.tronWeb.trx.getChainParameters(),
       this.tronWeb.trx.getAccount(to),
     ]);
 
-    const rawDataHex = (transaction as { raw_data_hex?: string }).raw_data_hex ?? '';
+    const rawDataHex =
+      (transaction as { raw_data_hex?: string }).raw_data_hex ?? '';
     const free = (resources.freeNetLimit ?? 0) - (resources.freeNetUsed ?? 0);
     const staked = (resources.NetLimit ?? 0) - (resources.NetUsed ?? 0);
     const recipientActivated = Object.keys(recipient ?? {}).length > 0;
@@ -110,8 +125,14 @@ export class TronService {
     };
   }
 
-  async signTransfer(transaction: object, privateKey: string): Promise<SignedTransfer> {
-    const signed = (await this.tronWeb.trx.sign(transaction as never, privateKey)) as {
+  async signTransfer(
+    transaction: object,
+    privateKey: string,
+  ): Promise<SignedTransfer> {
+    const signed = (await this.tronWeb.trx.sign(
+      transaction as never,
+      privateKey,
+    )) as {
       txID: string;
     };
 
@@ -143,7 +164,8 @@ export class TronService {
     return {
       status: resolveConfirmationStatus(info),
       feeNano: record?.fee === undefined ? null : sunToNano(BigInt(record.fee)),
-      blockNumber: record?.blockNumber === undefined ? null : BigInt(record.blockNumber),
+      blockNumber:
+        record?.blockNumber === undefined ? null : BigInt(record.blockNumber),
     };
   }
 

@@ -6,7 +6,9 @@ const REQUIRED = [
   'CHAINSTACK_API_KEY',
 ];
 
-export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
+export function validateEnv(
+  config: Record<string, unknown>,
+): Record<string, unknown> {
   const missing = REQUIRED.filter((key) => !config[key]);
 
   if (missing.length > 0) {

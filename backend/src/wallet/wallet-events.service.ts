@@ -22,7 +22,11 @@ export class WalletEventsService {
     this.emitter.emit(userId, next);
   }
 
-  waitForChange(userId: string, since: number, timeoutMs: number): Promise<number | null> {
+  waitForChange(
+    userId: string,
+    since: number,
+    timeoutMs: number,
+  ): Promise<number | null> {
     const current = this.versionFor(userId);
 
     if (current > since) {

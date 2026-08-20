@@ -59,14 +59,20 @@ export class IncomingScannerWorker {
   }
 
   private async record(transfer: IncomingTransfer) {
-    const wallet = await this.prisma.wallet.findUnique({ where: { address: transfer.to } });
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { address: transfer.to },
+    });
 
     if (!wallet) {
       return;
     }
 
     const known = await this.prisma.transaction.findFirst({
-      where: { userId: wallet.userId, txHash: transfer.txHash, direction: 'incoming' },
+      where: {
+        userId: wallet.userId,
+        txHash: transfer.txHash,
+        direction: 'incoming',
+      },
     });
 
     if (known) {
@@ -87,7 +93,10 @@ export class IncomingScannerWorker {
 
       this.events.bump(wallet.userId);
     } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
+      if (!(
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )) {
         throw error;
       }
     }

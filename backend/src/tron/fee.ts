@@ -14,9 +14,12 @@ export interface FeeBreakdownSun {
 }
 
 export function calculateFee(inputs: FeeInputs): FeeBreakdownSun {
-  const activationSun = inputs.recipientActivated ? 0n : inputs.accountActivationSun;
+  const activationSun = inputs.recipientActivated
+    ? 0n
+    : inputs.accountActivationSun;
   const coveredByBandwidth =
-    inputs.recipientActivated && inputs.availableBandwidth >= inputs.transactionBytes;
+    inputs.recipientActivated &&
+    inputs.availableBandwidth >= inputs.transactionBytes;
 
   const bandwidthSun = coveredByBandwidth
     ? 0n

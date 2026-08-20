@@ -18,7 +18,9 @@ describe('CryptoService', () => {
   it('produces a different ciphertext for the same input', () => {
     const service = makeService();
 
-    expect(service.encrypt('same input')).not.toBe(service.encrypt('same input'));
+    expect(service.encrypt('same input')).not.toBe(
+      service.encrypt('same input'),
+    );
   });
 
   it('never leaves the plaintext visible in the ciphertext', () => {
@@ -33,7 +35,9 @@ describe('CryptoService', () => {
     const tampered = Buffer.from(data, 'base64');
     tampered[0] ^= 0xff;
 
-    expect(() => service.decrypt([iv, tag, tampered.toString('base64')].join('.'))).toThrow();
+    expect(() =>
+      service.decrypt([iv, tag, tampered.toString('base64')].join('.')),
+    ).toThrow();
   });
 
   it('rejects a ciphertext produced with another master key', () => {

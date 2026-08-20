@@ -1,4 +1,7 @@
-import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { WalletService } from '../src/wallet/wallet.service';
 
@@ -35,7 +38,9 @@ function makeWalletService() {
   const tron = {
     isValidAddress: jest.fn().mockReturnValue(true),
     getBalanceNano: jest.fn(),
-    prepareTransfer: jest.fn().mockResolvedValue({ transaction: { raw: true }, fee: freeFee }),
+    prepareTransfer: jest
+      .fn()
+      .mockResolvedValue({ transaction: { raw: true }, fee: freeFee }),
     signTransfer: jest.fn(),
     broadcast: jest.fn().mockResolvedValue(undefined),
   };
@@ -51,7 +56,12 @@ function makeWalletService() {
     tron,
     crypto,
     events,
-    service: new WalletService(prisma as never, tron as never, crypto as never, events as never),
+    service: new WalletService(
+      prisma as never,
+      tron as never,
+      crypto as never,
+      events as never,
+    ),
   };
 }
 
@@ -94,7 +104,9 @@ describe('WalletService.overview', () => {
 describe('WalletService.history', () => {
   it('maps stored transactions to string amounts', async () => {
     const { prisma, service } = makeWalletService();
-    prisma.transaction.findMany.mockResolvedValue([transactionRow({ amountNano: 500_000_000n })]);
+    prisma.transaction.findMany.mockResolvedValue([
+      transactionRow({ amountNano: 500_000_000n }),
+    ]);
 
     const page = await service.history('user-1');
 
@@ -107,7 +119,9 @@ describe('WalletService.history', () => {
   it('returns a cursor only when more rows exist', async () => {
     const { prisma, service } = makeWalletService();
     prisma.transaction.findMany.mockResolvedValue(
-      Array.from({ length: 21 }, (_, index) => transactionRow({ id: `tx-${index}` })),
+      Array.from({ length: 21 }, (_, index) =>
+        transactionRow({ id: `tx-${index}` }),
+      ),
     );
 
     const page = await service.history('user-1');
@@ -132,7 +146,11 @@ describe('WalletService.exportCsv', () => {
   it('writes a header and one line per transaction', async () => {
     const { prisma, service } = makeWalletService();
     prisma.transaction.findMany.mockResolvedValue([
-      transactionRow({ status: 'confirmed', feeNano: 1_100_000_000n, txHash: 'hash-1' }),
+      transactionRow({
+        status: 'confirmed',
+        feeNano: 1_100_000_000n,
+        txHash: 'hash-1',
+      }),
     ]);
 
     const [header, row] = (await service.exportCsv('user-1')).split('\n');
@@ -166,14 +184,21 @@ describe('WalletService.send', () => {
     context.prisma.transaction.findUnique.mockResolvedValue(null);
     context.tron.getBalanceNano.mockResolvedValue(10_000_000_000n);
     context.prisma.transaction.create.mockResolvedValue(transactionRow());
-    context.tron.signTransfer.mockResolvedValue({ txHash: 'hash-1', signed: {} });
-    context.prisma.transaction.update.mockResolvedValue(transactionRow({ txHash: 'hash-1' }));
+    context.tron.signTransfer.mockResolvedValue({
+      txHash: 'hash-1',
+      signed: {},
+    });
+    context.prisma.transaction.update.mockResolvedValue(
+      transactionRow({ txHash: 'hash-1' }),
+    );
   }
 
   it('requires an idempotency key', async () => {
     const { service } = makeWalletService();
 
-    await expect(service.send('user-1', request, '')).rejects.toThrow('IDEMPOTENCY_KEY_REQUIRED');
+    await expect(service.send('user-1', request, '')).rejects.toThrow(
+      'IDEMPOTENCY_KEY_REQUIRED',
+    );
   });
 
   it('rejects an invalid recipient address', async () => {
@@ -181,16 +206,20 @@ describe('WalletService.send', () => {
     context.prisma.transaction.findUnique.mockResolvedValue(null);
     context.tron.isValidAddress.mockReturnValue(false);
 
-    await expect(context.service.send('user-1', request, 'key-1')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      context.service.send('user-1', request, 'key-1'),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('rejects an amount finer than one SUN', async () => {
     const context = makeWalletService();
 
     await expect(
-      context.service.send('user-1', { ...request, amountNano: '123456789' }, 'key-1'),
+      context.service.send(
+        'user-1',
+        { ...request, amountNano: '123456789' },
+        'key-1',
+      ),
     ).rejects.toThrow('AMOUNT_NOT_REPRESENTABLE_ON_CHAIN');
   });
 
@@ -203,7 +232,11 @@ describe('WalletService.send', () => {
     });
 
     await expect(
-      context.service.send('user-1', { ...request, toAddress: OUR_ADDRESS }, 'key-1'),
+      context.service.send(
+        'user-1',
+        { ...request, toAddress: OUR_ADDRESS },
+        'key-1',
+      ),
     ).rejects.toThrow('CANNOT_SEND_TO_SELF');
   });
 
@@ -212,9 +245,9 @@ describe('WalletService.send', () => {
     primeSuccessfulSend(context);
     context.tron.getBalanceNano.mockResolvedValue(100_000n);
 
-    await expect(context.service.send('user-1', request, 'key-1')).rejects.toThrow(
-      UnprocessableEntityException,
-    );
+    await expect(
+      context.service.send('user-1', request, 'key-1'),
+    ).rejects.toThrow(UnprocessableEntityException);
     expect(context.prisma.transaction.create).not.toHaveBeenCalled();
   });
 
@@ -228,7 +261,11 @@ describe('WalletService.send', () => {
     context.tron.getBalanceNano.mockResolvedValue(200_000_000n);
 
     await expect(
-      context.service.send('user-1', { ...request, amountNano: '200000000' }, 'key-1'),
+      context.service.send(
+        'user-1',
+        { ...request, amountNano: '200000000' },
+        'key-1',
+      ),
     ).rejects.toThrow(UnprocessableEntityException);
     expect(context.prisma.transaction.create).not.toHaveBeenCalled();
   });
@@ -260,7 +297,10 @@ describe('WalletService.send', () => {
     await context.service.send('user-1', request, 'key-1');
 
     expect(context.tron.prepareTransfer).toHaveBeenCalledTimes(1);
-    expect(context.tron.signTransfer).toHaveBeenCalledWith({ raw: true }, 'plain-private-key');
+    expect(context.tron.signTransfer).toHaveBeenCalledWith(
+      { raw: true },
+      'plain-private-key',
+    );
   });
 
   it('stores the hash before broadcasting so a crash cannot lose the transaction', async () => {
@@ -271,15 +311,17 @@ describe('WalletService.send', () => {
 
     expect(result.status).toBe('pending');
     expect(result.txHash).toBe('hash-1');
-    expect(context.prisma.transaction.update.mock.invocationCallOrder[0]).toBeLessThan(
-      context.tron.broadcast.mock.invocationCallOrder[0],
-    );
+    expect(
+      context.prisma.transaction.update.mock.invocationCallOrder[0],
+    ).toBeLessThan(context.tron.broadcast.mock.invocationCallOrder[0]);
   });
 
   it('returns the original transaction when the idempotency key repeats', async () => {
     const context = makeWalletService();
     primeSuccessfulSend(context);
-    context.prisma.transaction.findUnique.mockResolvedValue(transactionRow({ txHash: 'hash-1' }));
+    context.prisma.transaction.findUnique.mockResolvedValue(
+      transactionRow({ txHash: 'hash-1' }),
+    );
 
     const result = await context.service.send('user-1', request, 'key-1');
 
@@ -312,9 +354,13 @@ describe('WalletService.send', () => {
     const context = makeWalletService();
     primeSuccessfulSend(context);
     context.tron.signTransfer.mockRejectedValue(new Error('signing rejected'));
-    context.prisma.transaction.update.mockResolvedValue(transactionRow({ status: 'failed' }));
+    context.prisma.transaction.update.mockResolvedValue(
+      transactionRow({ status: 'failed' }),
+    );
 
-    expect((await context.service.send('user-1', request, 'key-1')).status).toBe('failed');
+    expect(
+      (await context.service.send('user-1', request, 'key-1')).status,
+    ).toBe('failed');
   });
 
   it('keeps the transaction pending when the broadcast connection drops', async () => {
@@ -372,7 +418,10 @@ describe('WalletService.estimate', () => {
     });
 
     await expect(
-      context.service.estimate('user-1', { toAddress: OUR_ADDRESS, amountNano: '1000' }),
+      context.service.estimate('user-1', {
+        toAddress: OUR_ADDRESS,
+        amountNano: '1000',
+      }),
     ).rejects.toThrow('CANNOT_SEND_TO_SELF');
   });
 });

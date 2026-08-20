@@ -1,7 +1,9 @@
 import { ConfirmationWorker } from '../src/workers/confirmation.worker';
 
 function makeWorker() {
-  const transactionsInTx = { updateMany: jest.fn().mockResolvedValue({ count: 1 }) };
+  const transactionsInTx = {
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  };
   const outboxInTx = { create: jest.fn().mockResolvedValue({}) };
   const prisma = {
     transaction: {
@@ -12,7 +14,10 @@ function makeWorker() {
       run({ transaction: transactionsInTx, outboxEvent: outboxInTx }),
     ),
   };
-  const tron = { getConfirmation: jest.fn(), getBalanceNano: jest.fn().mockResolvedValue(5_000_000_000n) };
+  const tron = {
+    getConfirmation: jest.fn(),
+    getBalanceNano: jest.fn().mockResolvedValue(5_000_000_000n),
+  };
   const events = { bump: jest.fn() };
 
   return {
@@ -21,7 +26,11 @@ function makeWorker() {
     events,
     transactionsInTx,
     outboxInTx,
-    worker: new ConfirmationWorker(prisma as never, tron as never, events as never),
+    worker: new ConfirmationWorker(
+      prisma as never,
+      tron as never,
+      events as never,
+    ),
   };
 }
 
@@ -40,7 +49,11 @@ function minutesAgo(minutes: number): Date {
 describe('ConfirmationWorker.resolve', () => {
   it('confirms a transaction and records one outbox event', async () => {
     const { tron, worker, transactionsInTx, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue({ status: 'confirmed', feeNano: 100000000n, blockNumber: 70000000n });
+    tron.getConfirmation.mockResolvedValue({
+      status: 'confirmed',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
 
     await worker.resolve(pendingTransaction);
 
@@ -67,7 +80,11 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('does not publish twice when another worker already confirmed it', async () => {
     const { tron, worker, transactionsInTx, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue({ status: 'confirmed', feeNano: 100000000n, blockNumber: 70000000n });
+    tron.getConfirmation.mockResolvedValue({
+      status: 'confirmed',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
     transactionsInTx.updateMany.mockResolvedValue({ count: 0 });
 
     await worker.resolve(pendingTransaction);
@@ -77,7 +94,11 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('marks a rejected transaction failed without publishing', async () => {
     const { prisma, tron, worker, outboxInTx } = makeWorker();
-    tron.getConfirmation.mockResolvedValue({ status: 'failed', feeNano: 100000000n, blockNumber: 70000000n });
+    tron.getConfirmation.mockResolvedValue({
+      status: 'failed',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
 
     await worker.resolve(pendingTransaction);
 
@@ -90,7 +111,11 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('leaves a fresh unconfirmed transaction alone', async () => {
     const { prisma, tron, worker } = makeWorker();
-    tron.getConfirmation.mockResolvedValue({ status: 'pending', feeNano: 100000000n, blockNumber: 70000000n });
+    tron.getConfirmation.mockResolvedValue({
+      status: 'pending',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
 
     await worker.resolve(pendingTransaction);
 
@@ -99,7 +124,11 @@ describe('ConfirmationWorker.resolve', () => {
 
   it('gives up on a transaction still unconfirmed after ten minutes', async () => {
     const { prisma, tron, worker } = makeWorker();
-    tron.getConfirmation.mockResolvedValue({ status: 'pending', feeNano: 100000000n, blockNumber: 70000000n });
+    tron.getConfirmation.mockResolvedValue({
+      status: 'pending',
+      feeNano: 100000000n,
+      blockNumber: 70000000n,
+    });
 
     await worker.resolve({ ...pendingTransaction, createdAt: minutesAgo(11) });
 
@@ -112,7 +141,11 @@ describe('ConfirmationWorker.resolve', () => {
   it('fails a transaction that never got a hash, without asking the network', async () => {
     const { prisma, tron, worker } = makeWorker();
 
-    await worker.resolve({ ...pendingTransaction, txHash: null, createdAt: minutesAgo(3) });
+    await worker.resolve({
+      ...pendingTransaction,
+      txHash: null,
+      createdAt: minutesAgo(3),
+    });
 
     expect(tron.getConfirmation).not.toHaveBeenCalled();
     expect(prisma.transaction.updateMany).toHaveBeenCalled();
@@ -136,7 +169,11 @@ describe('ConfirmationWorker.tick', () => {
     ]);
     tron.getConfirmation
       .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({ status: 'confirmed', feeNano: 0n, blockNumber: 1n });
+      .mockResolvedValueOnce({
+        status: 'confirmed',
+        feeNano: 0n,
+        blockNumber: 1n,
+      });
 
     await worker.tick();
 

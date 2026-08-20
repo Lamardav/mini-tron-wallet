@@ -29,13 +29,19 @@ export class OutboxPublisherWorker {
 
     for (const event of events) {
       try {
-        await this.kafka.publish(event.topic, event.id, event.payload as object);
+        await this.kafka.publish(
+          event.topic,
+          event.id,
+          event.payload as object,
+        );
         await this.prisma.outboxEvent.update({
           where: { id: event.id },
           data: { publishedAt: new Date() },
         });
       } catch (error) {
-        this.logger.warn(`Could not publish ${event.id}: ${(error as Error).message}`);
+        this.logger.warn(
+          `Could not publish ${event.id}: ${(error as Error).message}`,
+        );
 
         return;
       }

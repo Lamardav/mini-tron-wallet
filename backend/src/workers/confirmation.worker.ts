@@ -44,7 +44,9 @@ export class ConfirmationWorker {
       try {
         await this.resolve(transaction);
       } catch (error) {
-        this.logger.warn(`Could not resolve ${transaction.id}: ${(error as Error).message}`);
+        this.logger.warn(
+          `Could not resolve ${transaction.id}: ${(error as Error).message}`,
+        );
       }
     }
   }
@@ -107,7 +109,9 @@ export class ConfirmationWorker {
     });
   }
 
-  private async readBalance(transaction: PendingTransaction): Promise<bigint | null> {
+  private async readBalance(
+    transaction: PendingTransaction,
+  ): Promise<bigint | null> {
     const address = transaction.user?.wallet?.address;
 
     if (!address) {
@@ -117,7 +121,9 @@ export class ConfirmationWorker {
     try {
       return await this.tron.getBalanceNano(address);
     } catch (error) {
-      this.logger.warn(`Could not read the balance for ${address}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Could not read the balance for ${address}: ${(error as Error).message}`,
+      );
 
       return null;
     }

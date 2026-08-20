@@ -41,7 +41,7 @@ export async function api<T = any>(
 export async function registerUser(prefix: string): Promise<TestUser> {
   const email = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@e2e.test`;
   const result = await api('POST', '/auth/register', {
-    body: { email, password: 'Password123!' },
+    body: { email, password: 'e2e harbour lantern' },
   });
 
   if (result.status !== 201) {

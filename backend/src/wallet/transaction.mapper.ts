@@ -31,8 +31,11 @@ export interface TransactionResponse {
   createdAt: string;
 }
 
-export function toTransactionResponse(transaction: TransactionRecord): TransactionResponse {
-  const balanceBefore = transaction.balanceBeforeNano ?? derivedBalanceBefore(transaction);
+export function toTransactionResponse(
+  transaction: TransactionRecord,
+): TransactionResponse {
+  const balanceBefore =
+    transaction.balanceBeforeNano ?? derivedBalanceBefore(transaction);
 
   return {
     id: transaction.id,
@@ -60,5 +63,9 @@ function derivedBalanceBefore(transaction: TransactionRecord): bigint | null {
     return transaction.balanceAfterNano - transaction.amountNano;
   }
 
-  return transaction.balanceAfterNano + transaction.amountNano + (transaction.feeNano ?? 0n);
+  return (
+    transaction.balanceAfterNano +
+    transaction.amountNano +
+    (transaction.feeNano ?? 0n)
+  );
 }

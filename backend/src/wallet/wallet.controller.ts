@@ -30,19 +30,28 @@ export class WalletController {
   }
 
   @Get('transactions')
-  history(@Req() request: AuthenticatedRequest, @Query('cursor') cursor?: string) {
+  history(
+    @Req() request: AuthenticatedRequest,
+    @Query('cursor') cursor?: string,
+  ) {
     return this.wallet.history(request.user.id, cursor);
   }
 
   @Get('transactions/export')
   @Header('Content-Type', 'text/csv; charset=utf-8')
-  @Header('Content-Disposition', 'attachment; filename="tron-wallet-statement.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="tron-wallet-statement.csv"',
+  )
   export(@Req() request: AuthenticatedRequest) {
     return this.wallet.exportCsv(request.user.id);
   }
 
   @Get('updates')
-  updates(@Req() request: AuthenticatedRequest, @Query('since') since?: string) {
+  updates(
+    @Req() request: AuthenticatedRequest,
+    @Query('since') since?: string,
+  ) {
     return this.wallet.waitForUpdate(request.user.id, Number(since ?? 0) || 0);
   }
 

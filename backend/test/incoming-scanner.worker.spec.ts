@@ -20,18 +20,37 @@ function makeWorker() {
     getBlockTransfers: jest.fn().mockResolvedValue([]),
   };
 
-  return { prisma, tron, worker: new IncomingScannerWorker(prisma as never, tron as never, { bump: jest.fn() } as never) };
+  return {
+    prisma,
+    tron,
+    worker: new IncomingScannerWorker(
+      prisma as never,
+      tron as never,
+      { bump: jest.fn() } as never,
+    ),
+  };
 }
 
 describe('IncomingScannerWorker.tick', () => {
   it('records a transfer that landed on one of our wallets', async () => {
     const { prisma, tron, worker } = makeWorker();
     tron.getLatestBlockNumber.mockResolvedValue(101n);
-    prisma.syncState.upsert.mockResolvedValue({ id: 1, lastScannedBlock: 100n });
+    prisma.syncState.upsert.mockResolvedValue({
+      id: 1,
+      lastScannedBlock: 100n,
+    });
     tron.getBlockTransfers.mockResolvedValue([
-      { txHash: 'hash-in', from: SENDER, to: OUR_ADDRESS, amountNano: 1_000_000_000n },
+      {
+        txHash: 'hash-in',
+        from: SENDER,
+        to: OUR_ADDRESS,
+        amountNano: 1_000_000_000n,
+      },
     ]);
-    prisma.wallet.findUnique.mockResolvedValue({ userId: 'user-2', address: OUR_ADDRESS });
+    prisma.wallet.findUnique.mockResolvedValue({
+      userId: 'user-2',
+      address: OUR_ADDRESS,
+    });
 
     await worker.tick();
 
@@ -54,7 +73,10 @@ describe('IncomingScannerWorker.tick', () => {
   it('ignores transfers to addresses we do not own', async () => {
     const { prisma, tron, worker } = makeWorker();
     tron.getLatestBlockNumber.mockResolvedValue(101n);
-    prisma.syncState.upsert.mockResolvedValue({ id: 1, lastScannedBlock: 100n });
+    prisma.syncState.upsert.mockResolvedValue({
+      id: 1,
+      lastScannedBlock: 100n,
+    });
     tron.getBlockTransfers.mockResolvedValue([
       { txHash: 'hash-other', from: SENDER, to: 'TStranger', amountNano: 5n },
     ]);
@@ -67,11 +89,17 @@ describe('IncomingScannerWorker.tick', () => {
   it('does not record the same incoming transfer twice', async () => {
     const { prisma, tron, worker } = makeWorker();
     tron.getLatestBlockNumber.mockResolvedValue(101n);
-    prisma.syncState.upsert.mockResolvedValue({ id: 1, lastScannedBlock: 100n });
+    prisma.syncState.upsert.mockResolvedValue({
+      id: 1,
+      lastScannedBlock: 100n,
+    });
     tron.getBlockTransfers.mockResolvedValue([
       { txHash: 'hash-in', from: SENDER, to: OUR_ADDRESS, amountNano: 1000n },
     ]);
-    prisma.wallet.findUnique.mockResolvedValue({ userId: 'user-2', address: OUR_ADDRESS });
+    prisma.wallet.findUnique.mockResolvedValue({
+      userId: 'user-2',
+      address: OUR_ADDRESS,
+    });
     prisma.transaction.findFirst.mockResolvedValue({ id: 'already-there' });
 
     await worker.tick();
@@ -82,7 +110,10 @@ describe('IncomingScannerWorker.tick', () => {
   it('does nothing when no new blocks have been produced', async () => {
     const { prisma, tron, worker } = makeWorker();
     tron.getLatestBlockNumber.mockResolvedValue(100n);
-    prisma.syncState.upsert.mockResolvedValue({ id: 1, lastScannedBlock: 100n });
+    prisma.syncState.upsert.mockResolvedValue({
+      id: 1,
+      lastScannedBlock: 100n,
+    });
 
     await worker.tick();
 
@@ -93,7 +124,10 @@ describe('IncomingScannerWorker.tick', () => {
   it('scans at most twenty blocks in one pass', async () => {
     const { prisma, tron, worker } = makeWorker();
     tron.getLatestBlockNumber.mockResolvedValue(1000n);
-    prisma.syncState.upsert.mockResolvedValue({ id: 1, lastScannedBlock: 100n });
+    prisma.syncState.upsert.mockResolvedValue({
+      id: 1,
+      lastScannedBlock: 100n,
+    });
 
     await worker.tick();
 

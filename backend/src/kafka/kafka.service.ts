@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kafka, Producer } from 'kafkajs';
 
@@ -34,7 +39,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.producer.connect();
     } catch (error) {
-      this.logger.warn(`Kafka producer is not available yet: ${(error as Error).message}`);
+      this.logger.warn(
+        `Kafka producer is not available yet: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -47,6 +54,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    await this.producer.send({ topic, messages: [{ key, value: JSON.stringify(value) }] });
+    await this.producer.send({
+      topic,
+      messages: [{ key, value: JSON.stringify(value) }],
+    });
   }
 }

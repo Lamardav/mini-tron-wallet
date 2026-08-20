@@ -2,6 +2,12 @@ import { Kafka } from 'kafkajs';
 
 const TOPIC = 'wallet.transaction.confirmed';
 
+interface ConfirmedTransaction {
+  event?: string;
+  transaction_id?: string;
+  amount_nano?: string;
+}
+
 async function main() {
   const kafka = new Kafka({
     clientId: 'wallet-consumer',
@@ -12,7 +18,9 @@ async function main() {
 
   const admin = kafka.admin();
   await admin.connect();
-  await admin.createTopics({ topics: [{ topic: TOPIC, numPartitions: 1, replicationFactor: 1 }] });
+  await admin.createTopics({
+    topics: [{ topic: TOPIC, numPartitions: 1, replicationFactor: 1 }],
+  });
   await admin.disconnect();
 
   const consumer = kafka.consumer({ groupId: 'wallet-consumer' });
@@ -23,10 +31,16 @@ async function main() {
   console.log(`listening for ${TOPIC}`);
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
-      const event = JSON.parse(message.value?.toString() ?? '{}');
+    eachMessage: ({ message }) => {
+      const event = JSON.parse(
+        message.value?.toString() ?? '{}',
+      ) as ConfirmedTransaction;
 
-      console.log(`confirmed transaction ${event.transaction_id} for ${event.amount_nano} nanoTRX`);
+      console.log(
+        `confirmed transaction ${event.transaction_id} for ${event.amount_nano} nanoTRX`,
+      );
+
+      return Promise.resolve();
     },
   });
 }

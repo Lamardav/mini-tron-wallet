@@ -1,4 +1,7 @@
-import { parseBlockTransfers, resolveConfirmationStatus } from '../src/tron/tron.parse';
+import {
+  parseBlockTransfers,
+  resolveConfirmationStatus,
+} from '../src/tron/tron.parse';
 
 const OWNER = '41a614f803b6fd780986a42c78ec9c7f77e6ded13c';
 const RECIPIENT = '41b0f43a3a34c1e0d193ca2b3a68b63e9b360e4f10';
@@ -10,7 +13,9 @@ function transferTransaction(txId: string, amount: number) {
       contract: [
         {
           type: 'TransferContract',
-          parameter: { value: { owner_address: OWNER, to_address: RECIPIENT, amount } },
+          parameter: {
+            value: { owner_address: OWNER, to_address: RECIPIENT, amount },
+          },
         },
       ],
     },
@@ -19,7 +24,9 @@ function transferTransaction(txId: string, amount: number) {
 
 describe('parseBlockTransfers', () => {
   it('extracts plain TRX transfers', () => {
-    const block = { transactions: [transferTransaction('tx-transfer', 123456)] };
+    const block = {
+      transactions: [transferTransaction('tx-transfer', 123456)],
+    };
 
     expect(parseBlockTransfers(block)).toEqual([
       {
@@ -35,18 +42,50 @@ describe('parseBlockTransfers', () => {
     const block = {
       transactions: [
         transferTransaction('tx-transfer', 1),
-        { txID: 'tx-contract', raw_data: { contract: [{ type: 'TriggerSmartContract' }] } },
+        {
+          txID: 'tx-contract',
+          raw_data: { contract: [{ type: 'TriggerSmartContract' }] },
+        },
       ],
     };
 
-    expect(parseBlockTransfers(block).map((transfer) => transfer.txHash)).toEqual(['tx-transfer']);
+    expect(
+      parseBlockTransfers(block).map((transfer) => transfer.txHash),
+    ).toEqual(['tx-transfer']);
   });
 
   it('skips transfers with missing fields', () => {
     const block = {
       transactions: [
-        { txID: 'no-amount', raw_data: { contract: [{ type: 'TransferContract', parameter: { value: { owner_address: OWNER, to_address: RECIPIENT } } }] } },
-        { raw_data: { contract: [{ type: 'TransferContract', parameter: { value: { owner_address: OWNER, to_address: RECIPIENT, amount: 5 } } }] } },
+        {
+          txID: 'no-amount',
+          raw_data: {
+            contract: [
+              {
+                type: 'TransferContract',
+                parameter: {
+                  value: { owner_address: OWNER, to_address: RECIPIENT },
+                },
+              },
+            ],
+          },
+        },
+        {
+          raw_data: {
+            contract: [
+              {
+                type: 'TransferContract',
+                parameter: {
+                  value: {
+                    owner_address: OWNER,
+                    to_address: RECIPIENT,
+                    amount: 5,
+                  },
+                },
+              },
+            ],
+          },
+        },
       ],
     };
 
@@ -62,7 +101,12 @@ describe('parseBlockTransfers', () => {
 
 describe('resolveConfirmationStatus', () => {
   it('treats a plain TRX transfer without an execution result as confirmed', () => {
-    const info = { id: 'hash', blockNumber: 70244089, fee: 100000, receipt: { net_fee: 100000 } };
+    const info = {
+      id: 'hash',
+      blockNumber: 70244089,
+      fee: 100000,
+      receipt: { net_fee: 100000 },
+    };
 
     expect(resolveConfirmationStatus(info)).toBe('confirmed');
   });
@@ -74,13 +118,18 @@ describe('resolveConfirmationStatus', () => {
   });
 
   it('treats a rejected transaction as failed', () => {
-    expect(resolveConfirmationStatus({ blockNumber: 1, result: 'FAILED' })).toBe('failed');
+    expect(
+      resolveConfirmationStatus({ blockNumber: 1, result: 'FAILED' }),
+    ).toBe('failed');
   });
 
   it('treats a reverted contract call as failed', () => {
-    expect(resolveConfirmationStatus({ blockNumber: 1, receipt: { result: 'REVERT' } })).toBe(
-      'failed',
-    );
+    expect(
+      resolveConfirmationStatus({
+        blockNumber: 1,
+        receipt: { result: 'REVERT' },
+      }),
+    ).toBe('failed');
   });
 
   it('treats a transaction without a block as pending', () => {

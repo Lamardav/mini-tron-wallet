@@ -1,7 +1,15 @@
-import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto';
+import { LoginDto, RegisterDto, VerifyEmailDto } from './dto';
 import { AuthenticatedUser, JwtAuthGuard } from './jwt.guard';
 
 @Controller()
@@ -25,5 +33,20 @@ export class AuthController {
   @Get('me')
   me(@Req() request: { user: AuthenticatedUser }) {
     return this.auth.me(request.user.id);
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(200)
+  @Post('auth/verify')
+  verify(@Body() dto: VerifyEmailDto) {
+    return this.auth.verifyEmail(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @HttpCode(200)
+  @Post('auth/resend-verification')
+  resend(@Req() request: { user: AuthenticatedUser }) {
+    return this.auth.resendVerification(request.user.id);
   }
 }

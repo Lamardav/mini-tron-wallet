@@ -46,7 +46,11 @@ describe('calculateFee', () => {
   });
 
   it('treats exactly sufficient bandwidth as covered', () => {
-    expect(calculateFee({ ...base, availableBandwidth: 270 }).coveredByBandwidth).toBe(true);
-    expect(calculateFee({ ...base, availableBandwidth: 269 }).coveredByBandwidth).toBe(false);
+    expect(
+      calculateFee({ ...base, availableBandwidth: 270 }).coveredByBandwidth,
+    ).toBe(true);
+    expect(
+      calculateFee({ ...base, availableBandwidth: 269 }).coveredByBandwidth,
+    ).toBe(false);
   });
 });

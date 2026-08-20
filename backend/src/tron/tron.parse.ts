@@ -54,7 +54,8 @@ interface RawBlock {
 }
 
 export function parseBlockTransfers(block: unknown): BlockTransfer[] {
-  const transactions = (block as RawBlock | null | undefined)?.transactions ?? [];
+  const transactions =
+    (block as RawBlock | null | undefined)?.transactions ?? [];
   const transfers: BlockTransfer[] = [];
 
   for (const transaction of transactions) {
@@ -64,7 +65,11 @@ export function parseBlockTransfers(block: unknown): BlockTransfer[] {
       continue;
     }
 
-    const { owner_address: from, to_address: to, amount } = contract.parameter?.value ?? {};
+    const {
+      owner_address: from,
+      to_address: to,
+      amount,
+    } = contract.parameter?.value ?? {};
 
     if (!transaction.txID || !from || !to || typeof amount !== 'number') {
       continue;
