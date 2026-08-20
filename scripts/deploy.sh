@@ -21,4 +21,8 @@ ssh "$HOST" "cat > $DIR/.env" < .env
 
 echo "restarting the stack"
 ssh "$HOST" "cd $DIR && docker compose up -d --build"
+
+echo "recreating nginx so it picks up a replaced config file"
+ssh "$HOST" "cd $DIR && docker compose up -d --force-recreate frontend"
+
 ssh "$HOST" "cd $DIR && docker compose ps --format '{{.Service}} | {{.State}}'"
